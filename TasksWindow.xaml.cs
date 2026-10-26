@@ -3,7 +3,6 @@ using System.Linq;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
-using System.Windows.Media;
 using FloatTodo.Models;
 using FloatTodo.Services;
 
@@ -12,10 +11,6 @@ namespace FloatTodo;
 public partial class TasksWindow : Window
 {
     private const string TaskDragFormat = "FloatTodo.Internal.TaskId";
-    private static readonly Brush DragHighlightBrush =
-        new SolidColorBrush(Color.FromRgb(87, 125, 240));
-    private static readonly Brush ClearBorderBrush = Brushes.Transparent;
-
     private readonly TaskRepository _repository;
     private FrameworkElement? _armedHandle;
     private TodoItem? _armedItem;
@@ -58,6 +53,31 @@ public partial class TasksWindow : Window
         NewTaskBox.Focus();
     }
 
+    public void OpenPlanDialog() => Plan_Click(this, new RoutedEventArgs());
+
+    private void Plan_Click(object sender, RoutedEventArgs e)
+    {
+        IsEditing = true;
+        try
+        {
+            var dialog = new PlanTaskWindow(NewTaskBox.Text.Trim()) { Owner = this };
+            if (dialog.ShowDialog() == true)
+            {
+                Change(() => _repository.CreatePlannedTask(dialog.TaskTitle, dialog.StartLocal,
+                    dialog.Repeat, dialog.Reminder));
+                NewTaskBox.Clear();
+            }
+        }
+        finally { IsEditing = false; EditorClosed?.Invoke(); }
+    }
+
+    private void Schedules_Click(object sender, RoutedEventArgs e)
+    {
+        IsEditing = true;
+        try { new SchedulesWindow(_repository) { Owner = this }.ShowDialog(); }
+        finally { IsEditing = false; EditorClosed?.Invoke(); }
+    }
+
     private void NewTaskBox_KeyDown(object sender, KeyEventArgs e)
     {
         if (e.Key == Key.Enter) { Add_Click(sender, e); e.Handled = true; }
@@ -65,20 +85,15 @@ public partial class TasksWindow : Window
 
     private void Complete_Checked(object sender, RoutedEventArgs e)
     {
-        if (TagId(sender) is { } id)
-            Change(() => _repository.SetCompleted(id, true));
+        if (TagId(sender) is { } id) Change(() => _repository.SetCompleted(id, true));
     }
-
     private void Reopen_Unchecked(object sender, RoutedEventArgs e)
     {
-        if (TagId(sender) is { } id)
-            Change(() => _repository.SetCompleted(id, false));
+        if (TagId(sender) is { } id) Change(() => _repository.SetCompleted(id, false));
     }
-
     private void Delete_Click(object sender, RoutedEventArgs e)
     {
-        if (TagId(sender) is { } id)
-            Change(() => _repository.Delete(id));
+        if (TagId(sender) is { } id) Change(() => _repository.Delete(id));
     }
 
     private void Edit_Click(object sender, RoutedEventArgs e)
@@ -86,7 +101,6 @@ public partial class TasksWindow : Window
         if (TagId(sender) is not { } id) return;
         TodoItem? item = _repository.GetAll().FirstOrDefault(task => task.Id == id);
         if (item is null) return;
-
         IsEditing = true;
         try
         {
@@ -97,7 +111,6 @@ public partial class TasksWindow : Window
         finally { IsEditing = false; EditorClosed?.Invoke(); }
     }
 
-    // 仅从每行左侧的拖拽手柄发起拖动，避免与复选框、编辑、删除按钮冲突。
     private void DragHandle_MouseDown(object sender, MouseButtonEventArgs e)
     {
         if (e.ChangedButton != MouseButton.Left || sender is not FrameworkElement handle ||
@@ -112,31 +125,21 @@ public partial class TasksWindow : Window
 
     private void DragHandle_MouseMove(object sender, MouseEventArgs e)
     {
-        if (_armedHandle is null || _armedItem is null || !ReferenceEquals(sender, _armedHandle))
-            return;
-        if (e.LeftButton != MouseButtonState.Pressed)
-        {
-            ResetDragCandidate();
-            return;
-        }
-
-        var pointer = e.GetPosition(this);
-        if (Math.Abs(pointer.X - _dragStart.X) < SystemParameters.MinimumHorizontalDragDistance &&
-            Math.Abs(pointer.Y - _dragStart.Y) < SystemParameters.MinimumVerticalDragDistance)
-            return;
+        if (_armedHandle is null || _armedItem is null || !ReferenceEquals(sender, _armedHandle)) return;
+        if (e.LeftButton != MouseButtonState.Pressed) { ResetDragCandidate(); return; }
+        var p = e.GetPosition(this);
+        if (Math.Abs(p.X - _dragStart.X) < SystemParameters.MinimumHorizontalDragDistance &&
+            Math.Abs(p.Y - _dragStart.Y) < SystemParameters.MinimumVerticalDragDistance) return;
 
         var handle = _armedHandle;
         var item = _armedItem;
-        ResetDragCandidate();  // 开始 DoDragDrop 之前释放鼠标捕获，允许目标行接收 Drop。
+        ResetDragCandidate();
         _activeDrag = item;
-        try
-        {
-            DragDrop.DoDragDrop(handle,
-                new DataObject(TaskDragFormat, item.Id), DragDropEffects.Move);
-        }
+        try { DragDrop.DoDragDrop(handle, new DataObject(TaskDragFormat, item.Id), DragDropEffects.Move); }
         finally
         {
             _activeDrag = null;
+            HideDropLines();
             DragFinished?.Invoke();
         }
         e.Handled = true;
@@ -155,75 +158,93 @@ public partial class TasksWindow : Window
         _armedItem = null;
     }
 
-    private bool TryGetDropTarget(object sender, DragEventArgs e, out Border? row, out TodoItem? target)
+    /// <summary>
+    /// 以列表整体（包括行间空隙）计算插入边界：
+    /// B 下半区 / B-C 的间隙 / C 上半区都指向 B-C 之间的那条线。
+    /// </summary>
+    private bool TryGetInsertion(ScrollViewer viewer, DragEventArgs e, out ItemsControl list, out int index)
     {
-        row = sender as Border;
-        target = row?.DataContext as TodoItem;
-        return _activeDrag is not null && row is not null && target is not null &&
-               _activeDrag.Id != target.Id && _activeDrag.IsCompleted == target.IsCompleted &&
-               e.Data.GetDataPresent(TaskDragFormat) &&
-               e.Data.GetData(TaskDragFormat) is string id && id == _activeDrag.Id;
+        list = ReferenceEquals(viewer, PendingScroller) ? PendingList : CompletedList;
+        index = -1;
+        if (_activeDrag is null || _activeDrag.IsCompleted != ReferenceEquals(viewer, CompletedScroller) ||
+            !e.Data.GetDataPresent(TaskDragFormat) ||
+            e.Data.GetData(TaskDragFormat) is not string id || id != _activeDrag.Id)
+            return false;
+        var pointerY = e.GetPosition(viewer).Y;
+        index = list.Items.Count;
+        for (int i = 0; i < list.Items.Count; i++)
+        {
+            if (list.ItemContainerGenerator.ContainerFromIndex(i) is not FrameworkElement row) continue;
+            double top = row.TranslatePoint(new Point(0, 0), viewer).Y;
+            if (pointerY < top + row.ActualHeight / 2)
+            {
+                index = i;
+                break;
+            }
+        }
+        return true;
     }
 
-    // 列表较长时，拖到可视区域上下边缘即可继续滚动寻找目标。
     private void ListScroller_PreviewDragOver(object sender, DragEventArgs e)
     {
-        if (_activeDrag is null || sender is not ScrollViewer viewer) return;
-        if (ReferenceEquals(viewer, PendingScroller) && _activeDrag.IsCompleted) return;
-        if (ReferenceEquals(viewer, CompletedScroller) && !_activeDrag.IsCompleted) return;
-
+        if (sender is not ScrollViewer viewer) return;
+        if (!TryGetInsertion(viewer, e, out var list, out int index))
+        {
+            HideDropLines();
+            e.Effects = DragDropEffects.None;
+            e.Handled = true;
+            return;
+        }
         double y = e.GetPosition(viewer).Y;
-        const double edge = 26;
+        const double edge = 22;
         if (y < edge) viewer.LineUp();
         else if (y > viewer.ActualHeight - edge) viewer.LineDown();
-        // 不标记 Handled：下层任务行仍需接收 DragOver/Drop。
+
+        ShowDropLine(viewer, list, index);
+        e.Effects = DragDropEffects.Move;
+        e.Handled = true;
     }
 
-    private void TaskRow_DragOver(object sender, DragEventArgs e)
+    private void ListScroller_PreviewDrop(object sender, DragEventArgs e)
     {
-        if (!TryGetDropTarget(sender, e, out var row, out _))
+        if (sender is not ScrollViewer viewer ||
+            !TryGetInsertion(viewer, e, out _, out int index))
         {
-            if (sender is Border invalidRow) ClearDropHint(invalidRow);
             e.Effects = DragDropEffects.None;
+            e.Handled = true;
+            return;
         }
-        else
+        var item = _activeDrag!;
+        HideDropLines();
+        Change(() => _repository.ReorderAtIndex(item.Id, item.IsCompleted, index));
+        e.Effects = DragDropEffects.Move;
+        e.Handled = true;
+    }
+
+    private void ShowDropLine(ScrollViewer viewer, ItemsControl list, int index)
+    {
+        HideDropLines();
+        var line = ReferenceEquals(viewer, PendingScroller) ? PendingInsertionLine : CompletedInsertionLine;
+        double y = 1;
+        if (list.Items.Count > 0)
         {
-            // 上半部分表示插入目标前面，下半部分表示插入目标后面。
-            bool insertAfter = e.GetPosition(row!).Y >= row!.ActualHeight / 2;
-            row.BorderBrush = DragHighlightBrush;
-            row.BorderThickness = insertAfter
-                ? new Thickness(1, 1, 1, 3) : new Thickness(1, 3, 1, 1);
-            e.Effects = DragDropEffects.Move;
+            int itemIndex = Math.Min(index, list.Items.Count - 1);
+            if (list.ItemContainerGenerator.ContainerFromIndex(itemIndex) is FrameworkElement row)
+            {
+                double top = row.TranslatePoint(new Point(0, 0), viewer).Y;
+                y = index >= list.Items.Count ? top + row.ActualHeight - 4 : top - 4;
+            }
         }
-        e.Handled = true;
+        line.Width = Math.Max(1, viewer.ViewportWidth - 17);
+        Canvas.SetLeft(line, 3);
+        Canvas.SetTop(line, Math.Clamp(y, 0, Math.Max(0, viewer.ActualHeight - 3)));
+        line.Visibility = Visibility.Visible;
     }
 
-    private void TaskRow_DragLeave(object sender, DragEventArgs e)
+    private void HideDropLines()
     {
-        if (sender is Border row) ClearDropHint(row);
-        e.Handled = true;
-    }
-
-    private void TaskRow_Drop(object sender, DragEventArgs e)
-    {
-        if (sender is Border row) ClearDropHint(row);
-        if (TryGetDropTarget(sender, e, out var targetRow, out var target))
-        {
-            bool insertAfter = e.GetPosition(targetRow!).Y >= targetRow!.ActualHeight / 2;
-            string draggedId = _activeDrag!.Id;
-            string targetId = target!.Id;
-            Change(() => _repository.ReorderWithinGroup(draggedId, targetId, insertAfter));
-            e.Effects = DragDropEffects.Move;
-        }
-        else
-            e.Effects = DragDropEffects.None;
-        e.Handled = true;
-    }
-
-    private static void ClearDropHint(Border row)
-    {
-        row.BorderBrush = ClearBorderBrush;
-        row.BorderThickness = new Thickness(1);
+        PendingInsertionLine.Visibility = Visibility.Collapsed;
+        CompletedInsertionLine.Visibility = Visibility.Collapsed;
     }
 
     private static string? TagId(object sender) => (sender as FrameworkElement)?.Tag as string;
@@ -238,8 +259,8 @@ public partial class TasksWindow : Window
         }
         catch (Exception ex)
         {
-            MessageBox.Show(this, $"保存失败：{ex.Message}", "FloatTodo",
-                MessageBoxButton.OK, MessageBoxImage.Warning);
+            MessageBox.Show(this, $"保存失败：{ex.Message}", "FloatTodo", MessageBoxButton.OK,
+                MessageBoxImage.Warning);
         }
     }
 }

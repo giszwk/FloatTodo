@@ -33,6 +33,10 @@ public sealed class SettingsStore
         Value.DockThresholdPx = Math.Clamp(Value.DockThresholdPx, 8, 120);
         Value.VisiblePercent = Math.Clamp(Value.VisiblePercent, 20, 80);
         Value.CollapseDelayMs = Math.Clamp(Value.CollapseDelayMs, 100, 2000);
+        Value.WaterIntervalMinutes = Math.Clamp(Value.WaterIntervalMinutes, 10, 240);
+        Value.SittingIntervalMinutes = Math.Clamp(Value.SittingIntervalMinutes, 10, 240);
+        Value.QuietStartHour = Math.Clamp(Value.QuietStartHour, 0, 23);
+        Value.QuietEndHour = Math.Clamp(Value.QuietEndHour, 0, 23);
     }
 
     public void Save()

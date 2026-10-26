@@ -15,6 +15,8 @@ public partial class MainWindow : Window
 {
     private readonly TaskRepository _repository;
     private readonly SettingsStore _settings;
+    private readonly ReminderService _reminders;
+    private NotificationWindow? _notice;
     private readonly TasksWindow _panel;
     private readonly DispatcherTimer _collapseTimer;
     private Forms.NotifyIcon? _tray;
@@ -45,8 +47,14 @@ public partial class MainWindow : Window
         _collapseTimer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(settings.Value.CollapseDelayMs) };
         _collapseTimer.Tick += (_, _) => MaybeCollapse();
 
+        _reminders = new ReminderService(_repository, _settings);
+        _reminders.TasksGenerated += () => { _panel.RefreshItems(); UpdateBadge(); };
+        _reminders.NoticeReady += ShowReminder;
+        _reminders.SchedulerError += message =>
+            MessageBox.Show($"提醒调度已暂停：{message}", "FloatTodo", MessageBoxButton.OK, MessageBoxImage.Warning);
+
         BuildContextMenu();
-        Loaded += (_, _) => InitializePosition();
+        Loaded += (_, _) => { InitializePosition(); _reminders.Start(); };
         Closed += (_, _) => Cleanup();
         CreateTray();
         UpdateBadge();
@@ -256,6 +264,8 @@ public partial class MainWindow : Window
         var context = new ContextMenu();
         var tasks = new MenuItem { Header = "打开待办" };
         tasks.Click += (_, _) => ShowPanel();
+        var planned = new MenuItem { Header = "新建计划任务" };
+        planned.Click += (_, _) => { ShowPanel(); _panel.OpenPlanDialog(); };
         var settings = new MenuItem { Header = "设置" };
         settings.Click += (_, _) => OpenSettings();
         var hide = new MenuItem { Header = "隐藏悬浮球（可在托盘恢复）" };
@@ -263,6 +273,7 @@ public partial class MainWindow : Window
         var exit = new MenuItem { Header = "退出程序" };
         exit.Click += (_, _) => ExitApp();
         context.Items.Add(tasks);
+        context.Items.Add(planned);
         context.Items.Add(settings);
         context.Items.Add(new Separator());
         context.Items.Add(hide);
@@ -284,6 +295,7 @@ public partial class MainWindow : Window
         var menu = new Forms.ContextMenuStrip();
         menu.Items.Add("显示悬浮球", null, (_, _) => Dispatcher.Invoke(ShowBall));
         menu.Items.Add("打开待办", null, (_, _) => Dispatcher.Invoke(() => { ShowBall(); ShowPanel(); }));
+        menu.Items.Add("新建计划任务", null, (_, _) => Dispatcher.Invoke(() => { ShowBall(); ShowPanel(); _panel.OpenPlanDialog(); }));
         menu.Items.Add("设置", null, (_, _) => Dispatcher.Invoke(OpenSettings));
         menu.Items.Add(new Forms.ToolStripSeparator());
         menu.Items.Add("退出", null, (_, _) => Dispatcher.Invoke(ExitApp));
@@ -321,7 +333,16 @@ public partial class MainWindow : Window
                 _settings.Value.DockThresholdPx = dialog.ThresholdPx;
                 _settings.Value.VisiblePercent = dialog.VisiblePercent;
                 _settings.Value.CollapseDelayMs = dialog.CollapseDelayMs;
+                _settings.Value.WaterEnabled = dialog.WaterEnabled;
+                _settings.Value.WaterIntervalMinutes = dialog.WaterMinutes;
+                _settings.Value.SittingEnabled = dialog.SittingEnabled;
+                _settings.Value.SittingIntervalMinutes = dialog.SittingMinutes;
+                _settings.Value.ReminderSound = dialog.SoundEnabled;
+                _settings.Value.SuppressFullscreen = dialog.SuppressFullscreen;
+                _settings.Value.QuietStartHour = dialog.QuietStartHour;
+                _settings.Value.QuietEndHour = dialog.QuietEndHour;
                 _settings.Save();
+                _reminders.SettingsChanged();
                 if (_dock != DockSide.None)
                     SnapToEdge();
             }
@@ -329,11 +350,73 @@ public partial class MainWindow : Window
         finally { _settingsOpen = false; }
     }
 
+    private void ShowReminder(ReminderNotice notice)
+    {
+        if (_exiting)
+        {
+            _reminders.NoticeDismissed();
+            return;
+        }
+        _notice?.Close();
+        _panel.Hide();
+        var bubble = new NotificationWindow(notice);
+        _notice = bubble;
+        bubble.Completed += reminder =>
+        {
+            try
+            {
+                _reminders.Acknowledge(reminder);
+                _panel.RefreshItems();
+                UpdateBadge();
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"更新提醒失败：{ex.Message}", "FloatTodo", MessageBoxButton.OK, MessageBoxImage.Warning);
+            }
+        };
+        bubble.Snoozed += reminder =>
+        {
+            try { _reminders.Snooze(reminder); }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"稍后提醒设置失败：{ex.Message}", "FloatTodo", MessageBoxButton.OK, MessageBoxImage.Warning);
+            }
+        };
+        bubble.Closed += (_, _) =>
+        {
+            if (ReferenceEquals(_notice, bubble)) _notice = null;
+            _reminders.NoticeDismissed();
+            if (!_exiting) BeginCollapse();
+        };
+        bubble.Show();
+        bubble.UpdateLayout();
+        PositionReminder(bubble);
+        if (_settings.Value.ReminderSound)
+        {
+            try { System.Media.SystemSounds.Asterisk.Play(); }
+            catch { /* 音频设备不可用时不影响提醒 */ }
+        }
+    }
+
+    private void PositionReminder(NotificationWindow bubble)
+    {
+        var ball = NativeWindow.Rect(this);
+        var rect = NativeWindow.Rect(bubble);
+        var area = NativeWindow.WorkAreaNear(ball.CenterX, ball.CenterY);
+        var right = ball.Right + 12;
+        var left = ball.Left - rect.Width - 12;
+        int x = right + rect.Width <= area.Right ? right : left;
+        x = Math.Clamp(x, area.Left, Math.Max(area.Left, area.Right - rect.Width));
+        int y = Math.Clamp(ball.Top - 20, area.Top, Math.Max(area.Top, area.Bottom - rect.Height));
+        NativeWindow.Move(bubble, x, y);
+    }
+
     private void ExitApp()
     {
         if (_exiting) return;
         _exiting = true;
         _collapseTimer.Stop();
+        _reminders.Stop();
         SavePosition();
         System.Windows.Application.Current.Shutdown();
     }
@@ -341,6 +424,8 @@ public partial class MainWindow : Window
     private void Cleanup()
     {
         _collapseTimer.Stop();
+        _reminders.Stop();
+        _notice?.Close();
         _panel.Close();
         if (_tray is not null)
         {

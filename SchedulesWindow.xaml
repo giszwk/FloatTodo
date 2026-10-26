@@ -1,0 +1,29 @@
+<Window x:Class="FloatTodo.SchedulesWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="循环管理" Width="440" Height="355"
+        WindowStartupLocation="CenterOwner" WindowStyle="ToolWindow" ShowInTaskbar="False" Topmost="True">
+    <DockPanel Margin="18">
+        <TextBlock DockPanel.Dock="Top" Text="正在运行的循环任务" FontSize="17" FontWeight="SemiBold" Margin="0,0,0,12"/>
+        <TextBlock DockPanel.Dock="Bottom" Text="停止循环只影响未来新生成的任务，历史记录和现有待办保留。"
+                   TextWrapping="Wrap" FontSize="11" Foreground="{StaticResource Muted}" Margin="0,12,0,0"/>
+        <ListBox x:Name="SchedulesList" BorderThickness="0" Background="Transparent">
+            <ListBox.ItemTemplate>
+                <DataTemplate>
+                    <Border Margin="0,0,0,8" Padding="10" Background="#FFF1F5FC" CornerRadius="8">
+                        <DockPanel>
+                            <Button DockPanel.Dock="Right" Content="停止循环" Tag="{Binding Id}"
+                                    Click="Stop_Click" Margin="8,0,0,0"/>
+                            <StackPanel>
+                                <TextBlock Text="{Binding Title}" FontWeight="SemiBold"/>
+                                <TextBlock Text="{Binding Description}" Foreground="{StaticResource Muted}" FontSize="11"/>
+                                <TextBlock Text="{Binding NextLocal, StringFormat='下次：{0}'}"
+                                           Foreground="{StaticResource Muted}" FontSize="10"/>
+                            </StackPanel>
+                        </DockPanel>
+                    </Border>
+                </DataTemplate>
+            </ListBox.ItemTemplate>
+        </ListBox>
+    </DockPanel>
+</Window>
