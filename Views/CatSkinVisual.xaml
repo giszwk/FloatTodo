@@ -3,67 +3,27 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              Width="96" Height="96" Background="Transparent">
     <Grid Width="96" Height="96">
-        <!-- 立绘由本项目原创矢量绘制，不包含第三方角色图集。 -->
-        <Canvas x:Name="FullArtwork" Width="96" Height="96" Visibility="Visible" IsHitTestVisible="False">
-            <!-- 尾巴，稍稍外露 -->
-            <Path Data="M 69,65 C 94,49 91,83 78,80 C 74,79 76,73 80,68" Stroke="#151920"
-                  StrokeThickness="8" StrokeEndLineCap="Round" StrokeStartLineCap="Round" Fill="Transparent"/>
-            <!-- 身体与胸口 -->
-            <Ellipse Canvas.Left="30" Canvas.Top="57" Width="41" Height="35" Fill="#191D25" Stroke="#0A0E13" StrokeThickness="1.2"/>
-            <Ellipse Canvas.Left="40" Canvas.Top="70" Width="20" Height="15" Fill="#343D42" Opacity=".64"/>
-            <!-- 耳朵与头 -->
-            <Path Data="M 18,41 L 20,9 Q 21,5 27,12 L 42,25 Z" Fill="#191D25" Stroke="#0A0E13" StrokeThickness="1.6"/>
-            <Path Data="M 78,41 L 76,9 Q 75,5 69,12 L 54,25 Z" Fill="#191D25" Stroke="#0A0E13" StrokeThickness="1.6"/>
-            <Path Data="M 23,32 L 24,17 L 36,29 Z" Fill="#735F71" Opacity=".55" />
-            <Path Data="M 73,32 L 72,17 L 60,29 Z" Fill="#735F71" Opacity=".55" />
-            <Grid x:Name="FullHead" Width="76" Height="65" Canvas.Left="10" Canvas.Top="19">
-                <Grid.RenderTransform><TranslateTransform x:Name="HeadMove"/></Grid.RenderTransform>
-                <Ellipse Width="76" Height="65" Fill="#1E222B" Stroke="#0B1016" StrokeThickness="1.6" />
-                <Ellipse Width="12" Height="5" Fill="#485360" Opacity=".22" Margin="0,6,0,0" VerticalAlignment="Top"/>
-                <Ellipse Width="21" Height="26" Fill="#E6E9AF" Stroke="#9DAC89" StrokeThickness="1.1" HorizontalAlignment="Left" Margin="13,18,0,0" VerticalAlignment="Top"/>
-                <Ellipse Width="21" Height="26" Fill="#E6E9AF" Stroke="#9DAC89" StrokeThickness="1.1" HorizontalAlignment="Right" Margin="0,18,13,0" VerticalAlignment="Top"/>
-                <Ellipse x:Name="FullLeftPupil" Width="7" Height="14" Fill="#29353E" HorizontalAlignment="Left" VerticalAlignment="Top" Margin="22,26,0,0">
-                    <Ellipse.RenderTransform><TranslateTransform x:Name="LeftPupilMove" /></Ellipse.RenderTransform>
-                </Ellipse>
-                <Ellipse x:Name="FullRightPupil" Width="7" Height="14" Fill="#29353E" HorizontalAlignment="Right" VerticalAlignment="Top" Margin="0,26,22,0">
-                    <Ellipse.RenderTransform><TranslateTransform x:Name="RightPupilMove" /></Ellipse.RenderTransform>
-                </Ellipse>
-                <Ellipse Width="2.5" Height="3.5" Fill="White" Opacity=".86" HorizontalAlignment="Left" VerticalAlignment="Top" Margin="24,28,0,0"/>
-                <Ellipse Width="2.5" Height="3.5" Fill="White" Opacity=".86" HorizontalAlignment="Right" VerticalAlignment="Top" Margin="0,28,24,0"/>
-                <Path Data="M 34,47 Q 38,50 42,47" Stroke="#B6BAC1" StrokeThickness="1.35" StrokeStartLineCap="Round" StrokeEndLineCap="Round" Fill="Transparent"/>
-            </Grid>
-            <!-- 小脚，静态不晃动 -->
-            <Ellipse Canvas.Left="29" Canvas.Top="82" Width="15" Height="10" Fill="#171A20"/>
-            <Ellipse Canvas.Left="56" Canvas.Top="82" Width="15" Height="10" Fill="#171A20"/>
-            <Image x:Name="AtlasImage" Canvas.Left="2" Canvas.Top="0" Width="92" Height="96"
-                   Stretch="Uniform" Visibility="Collapsed"/>
-        </Canvas>
-        <!-- 扒边姿势：头向靠近可见屏幕的部分偏移，靠屏幕边缘露出半张脸和爪子。 -->
-        <Canvas x:Name="PeekArtwork" Width="96" Height="96" Visibility="Collapsed" IsHitTestVisible="False">
-            <Canvas x:Name="PeekCat" Width="96" Height="96">
-                <Path Data="M 13,54 L 16,20 Q 17,9 26,20 L 37,33 Z" Fill="#171B22" Stroke="#080B10" StrokeThickness="1.6"/>
-                <Path Data="M 83,54 L 80,20 Q 79,9 70,20 L 59,33 Z" Fill="#171B22" Stroke="#080B10" StrokeThickness="1.6"/>
-                <Path Data="M 20,38 L 20,23 L 31,35 Z" Fill="#6B5B6A" Opacity=".52"/>
-                <Path Data="M 76,38 L 76,23 L 65,35 Z" Fill="#6B5B6A" Opacity=".52"/>
-                <Ellipse Canvas.Left="8" Canvas.Top="29" Width="80" Height="68" Fill="#1B1F27" Stroke="#090D13" StrokeThickness="1.8"/>
-                <Grid Canvas.Left="16" Canvas.Top="48" Width="64" Height="30" x:Name="PeekEyes">
-                    <Grid.RenderTransform><ScaleTransform x:Name="PeekBlink" ScaleY="1" CenterY="15"/></Grid.RenderTransform>
-                    <Ellipse Width="24" Height="29" Fill="#E9EBBC" Stroke="#909E7B" StrokeThickness="1" HorizontalAlignment="Left"/>
-                    <Ellipse Width="24" Height="29" Fill="#E9EBBC" Stroke="#909E7B" StrokeThickness="1" HorizontalAlignment="Right"/>
-                    <Ellipse Width="8" Height="17" Fill="#263139" HorizontalAlignment="Left" Margin="9,3,0,0"/>
-                    <Ellipse Width="8" Height="17" Fill="#263139" HorizontalAlignment="Right" Margin="0,3,9,0"/>
-                </Grid>
-                <Path Data="M 43,85 Q 48,88 53,85" Stroke="#C4C6C3" StrokeThickness="1.1" StrokeStartLineCap="Round" StrokeEndLineCap="Round" Fill="Transparent"/>
-                <!-- 扒在屏幕边缘的两只爪子 -->
-                <Ellipse Canvas.Left="6" Canvas.Top="84" Width="19" Height="11" Fill="#252932" Stroke="#0B0E14" StrokeThickness="1.2" />
-                <Ellipse Canvas.Left="71" Canvas.Top="84" Width="19" Height="11" Fill="#252932" Stroke="#0B0E14" StrokeThickness="1.2" />
-                <Path Data="M 12,91 L 12,94 M 18,92 L 18,95 M 77,92 L 77,95 M 83,91 L 83,94" Stroke="#727984" StrokeThickness="1"/>
-            </Canvas>
-        </Canvas>
+        <!-- 猫咪仅使用位图图片或 GIF 帧；不再使用矢量路径绘制。 -->
+        <Grid x:Name="FullArtwork" Width="96" Height="96" IsHitTestVisible="False">
+            <Image x:Name="FullImage" Width="96" Height="96" Stretch="Uniform"
+                   Source="/FloatTodo;component/Assets/Skins/cat-visible.png">
+                <Image.RenderTransform><TranslateTransform x:Name="FullImageMove" /></Image.RenderTransform>
+            </Image>
+        </Grid>
+        <Grid x:Name="PeekArtwork" Width="96" Height="96" Visibility="Collapsed" IsHitTestVisible="False"
+              RenderTransformOrigin=".5,.5">
+            <Grid.RenderTransform>
+                <!-- 沿竖直轴镜像；不做上下颠倒或额外平移。 -->
+                <ScaleTransform x:Name="PeekScale" ScaleX="1" />
+            </Grid.RenderTransform>
+            <!-- 图片的透明边距较大；缩放并向外偏移，使窗口仅露出 40% 时仍能看到脸与爪子。 -->
+            <Image x:Name="PeekImage" Width="54" Height="72" Stretch="Uniform"
+                   HorizontalAlignment="Left" VerticalAlignment="Center" Margin="-12,0,0,0"
+                   Source="/FloatTodo;component/Assets/Skins/cat-peek.png" />
+        </Grid>
         <Border x:Name="CountBadge" Background="#FFFD6C78" CornerRadius="10"
                 MinWidth="19" Height="19" Padding="4,0" HorizontalAlignment="Right"
-                VerticalAlignment="Top" Margin="0,0,0,0" Visibility="Collapsed"
-                IsHitTestVisible="False">
+                VerticalAlignment="Top" Visibility="Collapsed" IsHitTestVisible="False">
             <TextBlock x:Name="CountText" Foreground="White" FontSize="10" FontWeight="Bold"
                        TextAlignment="Center" VerticalAlignment="Center" />
         </Border>

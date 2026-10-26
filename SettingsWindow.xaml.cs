@@ -11,6 +11,9 @@ public partial class SettingsWindow : Window
 {
     private string? _pendingAtlasPath;
     private bool _removeAtlas;
+    private string? _pendingFullGif;
+    private string? _pendingPeekGif;
+    private bool _removeGifs;
     public bool AtlasChanged { get; private set; }
     public SkinTheme SelectedSkin { get; private set; }
     public int ThresholdPx { get; private set; }
@@ -30,6 +33,7 @@ public partial class SettingsWindow : Window
         InitializeComponent();
         SkinCombo.SelectedIndex = settings.Skin == SkinTheme.BlackCat ? 1 : 0;
         RefreshAtlasStatus();
+        RefreshGifStatus();
         DistanceBox.Text = settings.DockThresholdPx.ToString();
         VisibleBox.Text = settings.VisiblePercent.ToString();
         DelayBox.Text = settings.CollapseDelayMs.ToString();
@@ -47,8 +51,8 @@ public partial class SettingsWindow : Window
     {
         AtlasStatus.Text = _pendingAtlasPath is not null
             ? "保存后导入：" + _pendingAtlasPath
-            : _removeAtlas ? "保存后移除自定义图集，恢复内置小黑猫。"
-            : File.Exists(SkinAtlas.StoragePath) ? "已安装用户图集（切换小黑猫皮肤后生效）" : "当前使用内置原创小黑猫绘图。";
+            : _removeAtlas ? "保存后移除自定义图集，恢复内置皮肤。"
+            : File.Exists(SkinAtlas.StoragePath) ? "已安装用户 PNG 图集。" : "未导入 PNG 图集，使用内置 GIF 皮肤。";
     }
 
     private void ImportAtlas_Click(object sender, RoutedEventArgs e)
@@ -76,6 +80,84 @@ public partial class SettingsWindow : Window
         _removeAtlas = true;
         _pendingAtlasPath = null;
         RefreshAtlasStatus();
+    }
+
+    private void RefreshGifStatus()
+    {
+        GifStatus.Text = _removeGifs ? "保存后删除两个 GIF，恢复内置 GIF 动作。"
+            : $"展开：{(_pendingFullGif is not null ? "待导入" : File.Exists(SkinGif.FullPath) ? "已导入" : "内置 GIF")}" +
+              $"；扒边：{(_pendingPeekGif is not null ? "待导入" : File.Exists(SkinGif.PeekPath) ? "已导入" : "内置 GIF")}";
+    }
+
+    private void ImportFullGif_Click(object sender, RoutedEventArgs e) => ImportGif(false);
+    private void ImportPeekGif_Click(object sender, RoutedEventArgs e) => ImportGif(true);
+
+    private void ImportGif(bool peek)
+    {
+        var picker = new OpenFileDialog
+        {
+            Title = peek ? "选择扒边时播放的 GIF" : "选择展开时播放的 GIF",
+            Filter = "GIF 动画 (*.gif)|*.gif", CheckFileExists = true
+        };
+        if (picker.ShowDialog(this) != true) return;
+        if (!SkinGif.TryOpen(picker.FileName, out _, out var error))
+        {
+            MessageBox.Show(this, error ?? "GIF 无效。", "无法导入", MessageBoxButton.OK, MessageBoxImage.Warning);
+            return;
+        }
+        if (peek) _pendingPeekGif = picker.FileName;
+        else _pendingFullGif = picker.FileName;
+        _removeGifs = false;
+        SkinCombo.SelectedIndex = 1;
+        RefreshGifStatus();
+    }
+
+    private void RemoveGifs_Click(object sender, RoutedEventArgs e)
+    {
+        _pendingFullGif = null;
+        _pendingPeekGif = null;
+        _removeGifs = true;
+        RefreshGifStatus();
+    }
+
+    private bool SaveGifChanges()
+    {
+        if (!_removeGifs && _pendingFullGif is null && _pendingPeekGif is null) return true;
+        try
+        {
+            if (_removeGifs)
+            {
+                if (File.Exists(SkinGif.FullPath)) File.Delete(SkinGif.FullPath);
+                if (File.Exists(SkinGif.PeekPath)) File.Delete(SkinGif.PeekPath);
+            }
+            else
+            {
+                foreach (var (source, destination) in new[]
+                    { (_pendingFullGif, SkinGif.FullPath), (_pendingPeekGif, SkinGif.PeekPath) })
+                {
+                    if (source is null) continue;
+                    if (!SkinGif.TryOpen(source, out _, out var error))
+                    {
+                        MessageBox.Show(this, error ?? "GIF 不可读取。", "导入失败", MessageBoxButton.OK, MessageBoxImage.Warning);
+                        return false;
+                    }
+                    Directory.CreateDirectory(Path.GetDirectoryName(destination)!);
+                    if (!string.Equals(Path.GetFullPath(source), Path.GetFullPath(destination), StringComparison.OrdinalIgnoreCase))
+                    {
+                        string temporary = destination + ".tmp";
+                        File.Copy(source, temporary, true);
+                        File.Move(temporary, destination, true);
+                    }
+                }
+            }
+            AtlasChanged = true; // 通知主窗口重新载入全部皮肤资源
+            return true;
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            MessageBox.Show(this, "GIF 保存失败：" + ex.Message, "保存失败", MessageBoxButton.OK, MessageBoxImage.Warning);
+            return false;
+        }
     }
 
     private bool SaveAtlasChanges()
@@ -126,7 +208,7 @@ public partial class SettingsWindow : Window
             MessageBox.Show(this, "请按各字段标注的范围填写整数。", "输入有误", MessageBoxButton.OK, MessageBoxImage.Information);
             return;
         }
-        if (!SaveAtlasChanges()) return;
+        if (!SaveAtlasChanges() || !SaveGifChanges()) return;
         SelectedSkin = SkinCombo.SelectedIndex == 1 ? SkinTheme.BlackCat : SkinTheme.DefaultBall;
         ThresholdPx = threshold;
         VisiblePercent = visible;

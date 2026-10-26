@@ -363,8 +363,11 @@ public sealed class TaskRepository
         cmd.ExecuteNonQuery();
     }
 
-    /// <summary>插入位置是原列表的边界 0..Count，移除拖动项后自动校正下标。</summary>
-    public bool ReorderAtIndex(string draggedId, bool completed, int insertionIndex)
+    /// <summary>
+    /// 按显示列表中的锚点移动：将 draggedId 插入 beforeId 之前；beforeId 为 null 时移到末尾。
+    /// 目标使用任务 ID 而非会因为移除拖动行而改变的索引，与蓝色插入线严格对应。
+    /// </summary>
+    public bool ReorderBefore(string draggedId, bool completed, string? beforeId)
     {
         using var c = Open();
         using var tx = c.BeginTransaction();
@@ -380,13 +383,14 @@ public sealed class TaskRepository
             using var reader = q.ExecuteReader();
             while (reader.Read()) ids.Add(reader.GetString(0));
         }
-        var oldIndex = ids.IndexOf(draggedId);
+        int oldIndex = ids.IndexOf(draggedId);
         if (oldIndex < 0) return false;
-        insertionIndex = Math.Clamp(insertionIndex, 0, ids.Count);
-        var target = insertionIndex > oldIndex ? insertionIndex - 1 : insertionIndex;
-        if (target == oldIndex) return false;
+        if (beforeId is not null && !ids.Contains(beforeId)) return false; // 拒绝失效锚点
         ids.RemoveAt(oldIndex);
+        int target = beforeId is null ? ids.Count : ids.IndexOf(beforeId);
+        if (target < 0) return false;
         ids.Insert(target, draggedId);
+        if (ids[oldIndex] == draggedId) return false; // 原地放下，无需改写数据库
         using var cmd = c.CreateCommand();
         cmd.Transaction = tx;
         cmd.CommandText = "UPDATE Tasks SET SortOrder=$order WHERE Id=$id;";
@@ -394,7 +398,9 @@ public sealed class TaskRepository
         var id = cmd.Parameters.Add("$id", SqliteType.Text);
         for (int i = 0; i < ids.Count; i++)
         {
-            order.Value = i; id.Value = ids[i]; cmd.ExecuteNonQuery();
+            order.Value = i;
+            id.Value = ids[i];
+            cmd.ExecuteNonQuery();
         }
         tx.Commit();
         return true;

@@ -26,17 +26,23 @@
                 <TextBlock Text="桌面皮肤" FontSize="17" FontWeight="SemiBold" Foreground="{StaticResource Ink}" Margin="0,0,0,10"/>
                 <ComboBox x:Name="SkinCombo" Margin="0,0,0,8" SelectedIndex="0">
                     <ComboBoxItem Content="默认蓝色悬浮球（v0.2 外观）"/>
-                    <ComboBoxItem Content="小黑猫（罗小黑风格 · 原创矢量）"/>
+                    <ComboBoxItem Content="罗小黑 GIF（内置 idle/waiting/review）"/>
                 </ComboBox>
                 <TextBlock FontSize="11" Foreground="{StaticResource Muted}" TextWrapping="Wrap"
-                           Text="隐藏时露出半张脸，平均约每 48–95 秒眨眼一次；展开时保持静止，约每 38–80 秒交替播放一次 Waiting / Review 短动作。" Margin="0,0,0,10"/>
+                           Text="展开默认停在 idle 第一帧，每 45–100 秒交替播放 waiting/review；半隐藏暂用 idle，每 60–120 秒短暂播放。可导入专用 GIF 替换。" Margin="0,0,0,10"/>
                 <StackPanel Orientation="Horizontal" Margin="0,0,0,5">
                     <Button Content="导入原版风格图集（PNG）" Click="ImportAtlas_Click" Padding="10,5" Margin="0,0,9,0"/>
                     <Button Content="移除导入图集" Click="RemoveAtlas_Click" Padding="10,5"/>
                 </StackPanel>
                 <TextBlock x:Name="AtlasStatus" Text="" FontSize="11" Foreground="{StaticResource Muted}" TextWrapping="Wrap" />
-                <TextBlock FontSize="11" Foreground="{StaticResource Muted}" TextWrapping="Wrap" Margin="0,4,0,0"
-                           Text="可选：用户自行从参考站点取得图集并转换为 PNG（1536×1872/2288）。导入后非隐藏状态使用图集的 Idle、Waiting 和 Review 帧；扒边动作仍使用内置原创绘图。"/>
+                <StackPanel Orientation="Horizontal" Margin="0,9,0,5">
+                    <Button Content="导入展开 GIF" Click="ImportFullGif_Click" Padding="8,5" Margin="0,0,7,0"/>
+                    <Button Content="导入扒边 GIF" Click="ImportPeekGif_Click" Padding="8,5" Margin="0,0,7,0"/>
+                    <Button Content="移除 GIF" Click="RemoveGifs_Click" Padding="8,5"/>
+                </StackPanel>
+                <TextBlock x:Name="GifStatus" FontSize="11" Foreground="{StaticResource Muted}" TextWrapping="Wrap"/>
+                <TextBlock FontSize="11" Foreground="{StaticResource Muted}" TextWrapping="Wrap" Margin="0,5,0,0"
+                           Text="自行导入的 GIF 优先于内置动作；移除自定义 GIF 后恢复内置。单次仅播放一次，最长 3 秒。最大 64 帧、640×640、20MB。"/>
                 <Separator Margin="0,15,0,15"/>
                 <TextBlock Text="健康提醒" FontSize="17" FontWeight="SemiBold" Foreground="{StaticResource Ink}" Margin="0,0,0,10"/>
                 <CheckBox x:Name="WaterCheck" Content="开启喝水提醒" Margin="0,0,0,8"/>

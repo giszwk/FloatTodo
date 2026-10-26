@@ -20,6 +20,7 @@ public partial class MainWindow : Window
     private readonly TasksWindow _panel;
     private readonly DispatcherTimer _collapseTimer;
     private Forms.NotifyIcon? _tray;
+    private Forms.ToolStripMenuItem? _trayVisibilityItem;
     private bool _pressed;
     private bool _dragging;
     private bool _settingsOpen;
@@ -39,15 +40,16 @@ public partial class MainWindow : Window
         CatVisual.ReloadAtlas();
         ApplySkinVisual(false);
 
+        // 先初始化计时器，再注册会访问计时器的面板事件，避免 CS8602 空引用警告。
+        _collapseTimer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(settings.Value.CollapseDelayMs) };
+        _collapseTimer.Tick += (_, _) => MaybeCollapse();
+
         _panel = new TasksWindow(_repository);
         _panel.MouseEnter += (_, _) => _collapseTimer.Stop();
         _panel.MouseLeave += (_, _) => BeginCollapse();
         _panel.TasksChanged += UpdateBadge;
         _panel.EditorClosed += BeginCollapse;
         _panel.DragFinished += BeginCollapse;
-
-        _collapseTimer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(settings.Value.CollapseDelayMs) };
-        _collapseTimer.Tick += (_, _) => MaybeCollapse();
 
         _reminders = new ReminderService(_repository, _settings);
         _reminders.TasksGenerated += () => { _panel.RefreshItems(); UpdateBadge(); };
@@ -329,14 +331,6 @@ public partial class MainWindow : Window
         context.Items.Add(tasks);
         context.Items.Add(planned);
         context.Items.Add(settings);
-        var skins = new MenuItem { Header = "切换皮肤" };
-        var ball = new MenuItem { Header = "默认蓝色悬浮球" };
-        var cat = new MenuItem { Header = "小黑猫（罗小黑风格）" };
-        ball.Click += (_, _) => SwitchSkin(SkinTheme.DefaultBall);
-        cat.Click += (_, _) => SwitchSkin(SkinTheme.BlackCat);
-        skins.Items.Add(ball);
-        skins.Items.Add(cat);
-        context.Items.Add(skins);
         context.Items.Add(new Separator());
         context.Items.Add(hide);
         context.Items.Add(exit);
@@ -355,16 +349,30 @@ public partial class MainWindow : Window
             Visible = true
         };
         var menu = new Forms.ContextMenuStrip();
-        menu.Items.Add("显示悬浮球", null, (_, _) => Dispatcher.Invoke(ShowBall));
+        _trayVisibilityItem = new Forms.ToolStripMenuItem("隐藏悬浮球");
+        _trayVisibilityItem.Click += (_, _) => Dispatcher.Invoke(ToggleBallVisibility);
+        menu.Items.Add(_trayVisibilityItem);
         menu.Items.Add("打开待办", null, (_, _) => Dispatcher.Invoke(() => { ShowBall(); ShowPanel(); }));
         menu.Items.Add("新建计划任务", null, (_, _) => Dispatcher.Invoke(() => { ShowBall(); ShowPanel(); _panel.OpenPlanDialog(); }));
         menu.Items.Add("设置", null, (_, _) => Dispatcher.Invoke(OpenSettings));
-        menu.Items.Add("切换为默认球", null, (_, _) => Dispatcher.Invoke(() => SwitchSkin(SkinTheme.DefaultBall)));
-        menu.Items.Add("切换为小黑猫", null, (_, _) => Dispatcher.Invoke(() => SwitchSkin(SkinTheme.BlackCat)));
+        // 皮肤仅在设置窗口修改，防止两个入口不同步。
+        menu.Opening += (_, _) => RefreshTrayVisibilityText();
         menu.Items.Add(new Forms.ToolStripSeparator());
         menu.Items.Add("退出", null, (_, _) => Dispatcher.Invoke(ExitApp));
         _tray.ContextMenuStrip = menu;
         _tray.DoubleClick += (_, _) => Dispatcher.Invoke(() => { ShowBall(); ShowPanel(); });
+    }
+
+    private void RefreshTrayVisibilityText()
+    {
+        if (_trayVisibilityItem is not null)
+            _trayVisibilityItem.Text = IsVisible ? "隐藏悬浮球" : "显示悬浮球";
+    }
+
+    private void ToggleBallVisibility()
+    {
+        if (IsVisible) HideBall();
+        else ShowBall();
     }
 
     private void HideBall()
@@ -372,6 +380,7 @@ public partial class MainWindow : Window
         _collapseTimer.Stop();
         _panel.Hide();
         Hide();
+        RefreshTrayVisibilityText();
     }
 
     private void ShowBall()
@@ -382,6 +391,7 @@ public partial class MainWindow : Window
             Topmost = true;
             // 临时隐藏后只需恢复窗口，不重新应用旧位置。
         }
+        RefreshTrayVisibilityText();
     }
 
     private void OpenSettings()

@@ -7,7 +7,7 @@
     <Nullable>enable</Nullable>
     <ImplicitUsings>disable</ImplicitUsings>
     <LangVersion>latest</LangVersion>
-    <Version>0.3.1</Version>
+    <Version>0.3.5</Version>
     <ApplicationManifest>app.manifest</ApplicationManifest>
     <ApplicationIcon>Assets\AppIcon.ico</ApplicationIcon>
     <AssemblyName>FloatTodo</AssemblyName>
@@ -16,5 +16,10 @@
   <ItemGroup>
     <PackageReference Include="Microsoft.Data.Sqlite" Version="10.0.13" />
     <Content Include="Assets\AppIcon.ico" CopyToOutputDirectory="PreserveNewest" />
+    <Resource Include="Assets\Skins\cat-visible.png" />
+    <Resource Include="Assets\Skins\cat-peek.png" />
+    <Resource Include="Assets\Skins\cat-peek-blink.png" />
+    <!-- 原样保留用户提供的 GIF；程序正常运行时从输出目录读取。 -->
+    <Content Include="Assets\Skins\LuoXiaoHei\*.gif" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 </Project>

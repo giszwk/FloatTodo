@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Linq;
 using System.Windows;
 using System.Windows.Controls;
@@ -16,6 +17,9 @@ public partial class TasksWindow : Window
     private TodoItem? _armedItem;
     private Point _dragStart;
     private TodoItem? _activeDrag;
+    // WPF ItemsControl 的容器生成器可能暂时返回 null；保存真实行控件，
+    // 不再错误地把未知位置当作“列表末尾”。
+    private readonly Dictionary<string, FrameworkElement> _rows = new();
 
     public event Action? TasksChanged;
     public event Action? EditorClosed;
@@ -158,37 +162,66 @@ public partial class TasksWindow : Window
         _armedItem = null;
     }
 
+    private void TaskRow_Loaded(object sender, RoutedEventArgs e)
+    {
+        if (sender is FrameworkElement { DataContext: TodoItem item } row)
+            _rows[item.Id] = row;
+    }
+
+    private void TaskRow_Unloaded(object sender, RoutedEventArgs e)
+    {
+        if (sender is FrameworkElement { DataContext: TodoItem item } row &&
+            _rows.TryGetValue(item.Id, out var current) && ReferenceEquals(current, row))
+            _rows.Remove(item.Id);
+    }
+
     /// <summary>
-    /// 以列表整体（包括行间空隙）计算插入边界：
-    /// B 下半区 / B-C 的间隙 / C 上半区都指向 B-C 之间的那条线。
+    /// 根据可见行的中线决定插入边界，包含行间留白；得到边界右侧任务的 ID，
+    /// 而非下标。指示线和 Drop 共用同一个锚点算法。
     /// </summary>
-    private bool TryGetInsertion(ScrollViewer viewer, DragEventArgs e, out ItemsControl list, out int index)
+    private bool TryGetInsertion(ScrollViewer viewer, DragEventArgs e,
+        out ItemsControl list, out int index, out string? beforeId)
     {
         list = ReferenceEquals(viewer, PendingScroller) ? PendingList : CompletedList;
         index = -1;
+        beforeId = null;
         if (_activeDrag is null || _activeDrag.IsCompleted != ReferenceEquals(viewer, CompletedScroller) ||
             !e.Data.GetDataPresent(TaskDragFormat) ||
             e.Data.GetData(TaskDragFormat) is not string id || id != _activeDrag.Id)
             return false;
-        var pointerY = e.GetPosition(viewer).Y;
-        index = list.Items.Count;
+
+        // 列表行必须全部能定位；否则拒绝 Drop，绝不默认为末尾。
+        var bounds = new List<(double Top, double Bottom)>();
         for (int i = 0; i < list.Items.Count; i++)
         {
-            if (list.ItemContainerGenerator.ContainerFromIndex(i) is not FrameworkElement row) continue;
+            if (list.Items[i] is not TodoItem target ||
+                !_rows.TryGetValue(target.Id, out var row) ||
+                !row.IsLoaded || row.ActualHeight <= 0)
+                return false;
             double top = row.TranslatePoint(new Point(0, 0), viewer).Y;
-            if (pointerY < top + row.ActualHeight / 2)
+            if (!double.IsFinite(top)) return false;
+            bounds.Add((top, top + row.ActualHeight));
+        }
+
+        double pointerY = e.GetPosition(viewer).Y;
+        // B 后半段、B/C 间隙与 C 前半段均命中“插入 C 前”的同一条线。
+        index = bounds.Count;
+        for (int i = 0; i < bounds.Count; i++)
+        {
+            if (pointerY < (bounds[i].Top + bounds[i].Bottom) / 2)
             {
                 index = i;
                 break;
             }
         }
+        beforeId = index < list.Items.Count ? (list.Items[index] as TodoItem)?.Id : null;
         return true;
     }
 
     private void ListScroller_PreviewDragOver(object sender, DragEventArgs e)
     {
         if (sender is not ScrollViewer viewer) return;
-        if (!TryGetInsertion(viewer, e, out var list, out int index))
+        if (!TryGetInsertion(viewer, e, out var list, out int index, out _))
         {
             HideDropLines();
             e.Effects = DragDropEffects.None;
@@ -199,7 +232,6 @@ public partial class TasksWindow : Window
         const double edge = 22;
         if (y < edge) viewer.LineUp();
         else if (y > viewer.ActualHeight - edge) viewer.LineDown();
-
         ShowDropLine(viewer, list, index);
         e.Effects = DragDropEffects.Move;
         e.Handled = true;
@@ -208,7 +240,7 @@ public partial class TasksWindow : Window
     private void ListScroller_PreviewDrop(object sender, DragEventArgs e)
     {
         if (sender is not ScrollViewer viewer ||
-            !TryGetInsertion(viewer, e, out _, out int index))
+            !TryGetInsertion(viewer, e, out _, out _, out string? beforeId))
         {
             e.Effects = DragDropEffects.None;
             e.Handled = true;
@@ -216,7 +248,7 @@ public partial class TasksWindow : Window
         }
         var item = _activeDrag!;
         HideDropLines();
-        Change(() => _repository.ReorderAtIndex(item.Id, item.IsCompleted, index));
+        Change(() => _repository.ReorderBefore(item.Id, item.IsCompleted, beforeId));
         e.Effects = DragDropEffects.Move;
         e.Handled = true;
     }
@@ -225,17 +257,25 @@ public partial class TasksWindow : Window
     {
         HideDropLines();
         var line = ReferenceEquals(viewer, PendingScroller) ? PendingInsertionLine : CompletedInsertionLine;
-        double y = 1;
-        if (list.Items.Count > 0)
+        // 横线画在两行之间的实际空白处，而不是贴在下一行的边框上。
+        FrameworkElement? prev = index > 0 && list.Items[index - 1] is TodoItem previous &&
+            _rows.TryGetValue(previous.Id, out var beforeRow) ? beforeRow : null;
+        FrameworkElement? next = index < list.Items.Count && list.Items[index] is TodoItem following &&
+            _rows.TryGetValue(following.Id, out var afterRow) ? afterRow : null;
+        double y;
+        if (prev is not null && next is not null)
         {
-            int itemIndex = Math.Min(index, list.Items.Count - 1);
-            if (list.ItemContainerGenerator.ContainerFromIndex(itemIndex) is FrameworkElement row)
-            {
-                double top = row.TranslatePoint(new Point(0, 0), viewer).Y;
-                y = index >= list.Items.Count ? top + row.ActualHeight - 4 : top - 4;
-            }
+            var bottom = prev.TranslatePoint(new Point(0, prev.ActualHeight), viewer).Y;
+            var top = next.TranslatePoint(new Point(0, 0), viewer).Y;
+            y = (bottom + top) / 2;
         }
-        line.Width = Math.Max(1, viewer.ViewportWidth - 17);
+        else if (next is not null)
+            y = next.TranslatePoint(new Point(0, 0), viewer).Y + 1;
+        else if (prev is not null)
+            y = prev.TranslatePoint(new Point(0, prev.ActualHeight), viewer).Y - 2;
+        else
+            y = 2;
+        line.Width = Math.Max(1, viewer.ActualWidth - SystemParameters.VerticalScrollBarWidth - 8);
         Canvas.SetLeft(line, 3);
         Canvas.SetTop(line, Math.Clamp(y, 0, Math.Max(0, viewer.ActualHeight - 3)));
         line.Visibility = Visibility.Visible;
