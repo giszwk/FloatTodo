@@ -36,6 +36,8 @@ public partial class MainWindow : Window
         _settings = settings;
         _dock = settings.Value.Dock;
         InitializeComponent();
+        CatVisual.ReloadAtlas();
+        ApplySkinVisual(false);
 
         _panel = new TasksWindow(_repository);
         _panel.MouseEnter += (_, _) => _collapseTimer.Stop();
@@ -112,6 +114,7 @@ public partial class MainWindow : Window
             _dock = DockSide.None;
             _expanded = false;
             _panel.Hide();
+            CatVisual.SetDockState(false, DockSide.None);
         }
         NativeWindow.Move(this, _pressRect.Left + dx, _pressRect.Top + dy);
     }
@@ -151,6 +154,7 @@ public partial class MainWindow : Window
         }
         else
             _dock = DockSide.None;
+        CatVisual.SetDockState(false, _dock);
         SavePosition();
         if (_dock != DockSide.None) BeginCollapse();
     }
@@ -163,6 +167,7 @@ public partial class MainWindow : Window
         int x = _dock == DockSide.Left ? area.Left : area.Right - rect.Width;
         NativeWindow.Move(this, x, rect.Top);
         _expanded = true;
+        CatVisual.SetDockState(false, _dock);
     }
 
     private void SnapToEdge()
@@ -177,6 +182,7 @@ public partial class MainWindow : Window
         int y = Math.Clamp(rect.Top, area.Top, Math.Max(area.Top, area.Bottom - rect.Height));
         NativeWindow.Move(this, x, y);
         _expanded = false;
+        CatVisual.SetDockState(true, _dock);
     }
 
     private void ShowPanel()
@@ -239,6 +245,7 @@ public partial class MainWindow : Window
     {
         int count = _repository.GetPendingCount();
         BallVisual.ShowPendingCount(count);
+        CatVisual.ShowPendingCount(count);
     }
 
     private void SavePosition()
@@ -259,6 +266,53 @@ public partial class MainWindow : Window
         _settings.Save();
     }
 
+    // 皮肤与窗口尺寸分离。桌面拖动/吸边始终操作主窗口，不与具体绘图绑定。
+    private void ApplySkinVisual(bool reposition)
+    {
+        bool cat = _settings.Value.Skin == SkinTheme.BlackCat;
+        NativeWindow.PixelRect before = default;
+        if (reposition && IsLoaded) before = NativeWindow.Rect(this);
+        BallVisual.Visibility = cat ? Visibility.Collapsed : Visibility.Visible;
+        CatVisual.Visibility = cat ? Visibility.Visible : Visibility.Collapsed;
+        Width = cat ? 96 : 64;
+        Height = cat ? 96 : 64;
+        CatVisual.SetDockState(_dock != DockSide.None && !_expanded, _dock);
+
+        if (!reposition || !IsLoaded) return;
+        // 先让 WPF 完成 Window 的实际尺寸变化，再按物理像素重新定位。
+        Dispatcher.BeginInvoke(new Action(() =>
+        {
+            var after = NativeWindow.Rect(this);
+            var area = NativeWindow.WorkAreaNear(before.CenterX, before.CenterY);
+            _dockWork = area;
+            if (_dock != DockSide.None)
+            {
+                NativeWindow.Move(this,
+                    _dock == DockSide.Left ? area.Left : area.Right - after.Width,
+                    Math.Clamp(before.Top, area.Top, Math.Max(area.Top, area.Bottom - after.Height)));
+                if (!_expanded) SnapToEdge();
+                else CatVisual.SetDockState(false, _dock);
+            }
+            else
+            {
+                int targetX = Math.Clamp(before.CenterX - after.Width / 2, area.Left,
+                    Math.Max(area.Left, area.Right - after.Width));
+                int targetY = Math.Clamp(before.CenterY - after.Height / 2, area.Top,
+                    Math.Max(area.Top, area.Bottom - after.Height));
+                NativeWindow.Move(this, targetX, targetY);
+            }
+            SavePosition();
+        }), DispatcherPriority.Loaded);
+    }
+
+    private void SwitchSkin(SkinTheme skin)
+    {
+        if (_settings.Value.Skin == skin) return;
+        _settings.Value.Skin = skin;
+        _settings.Save();
+        ApplySkinVisual(true);
+    }
+
     private void BuildContextMenu()
     {
         var context = new ContextMenu();
@@ -275,6 +329,14 @@ public partial class MainWindow : Window
         context.Items.Add(tasks);
         context.Items.Add(planned);
         context.Items.Add(settings);
+        var skins = new MenuItem { Header = "切换皮肤" };
+        var ball = new MenuItem { Header = "默认蓝色悬浮球" };
+        var cat = new MenuItem { Header = "小黑猫（罗小黑风格）" };
+        ball.Click += (_, _) => SwitchSkin(SkinTheme.DefaultBall);
+        cat.Click += (_, _) => SwitchSkin(SkinTheme.BlackCat);
+        skins.Items.Add(ball);
+        skins.Items.Add(cat);
+        context.Items.Add(skins);
         context.Items.Add(new Separator());
         context.Items.Add(hide);
         context.Items.Add(exit);
@@ -297,6 +359,8 @@ public partial class MainWindow : Window
         menu.Items.Add("打开待办", null, (_, _) => Dispatcher.Invoke(() => { ShowBall(); ShowPanel(); }));
         menu.Items.Add("新建计划任务", null, (_, _) => Dispatcher.Invoke(() => { ShowBall(); ShowPanel(); _panel.OpenPlanDialog(); }));
         menu.Items.Add("设置", null, (_, _) => Dispatcher.Invoke(OpenSettings));
+        menu.Items.Add("切换为默认球", null, (_, _) => Dispatcher.Invoke(() => SwitchSkin(SkinTheme.DefaultBall)));
+        menu.Items.Add("切换为小黑猫", null, (_, _) => Dispatcher.Invoke(() => SwitchSkin(SkinTheme.BlackCat)));
         menu.Items.Add(new Forms.ToolStripSeparator());
         menu.Items.Add("退出", null, (_, _) => Dispatcher.Invoke(ExitApp));
         _tray.ContextMenuStrip = menu;
@@ -341,9 +405,13 @@ public partial class MainWindow : Window
                 _settings.Value.SuppressFullscreen = dialog.SuppressFullscreen;
                 _settings.Value.QuietStartHour = dialog.QuietStartHour;
                 _settings.Value.QuietEndHour = dialog.QuietEndHour;
+                var skinChanged = _settings.Value.Skin != dialog.SelectedSkin;
+                _settings.Value.Skin = dialog.SelectedSkin;
                 _settings.Save();
+                if (dialog.AtlasChanged) CatVisual.ReloadAtlas();
+                if (skinChanged) ApplySkinVisual(true);
                 _reminders.SettingsChanged();
-                if (_dock != DockSide.None)
+                if (_dock != DockSide.None && !skinChanged)
                     SnapToEdge();
             }
         }

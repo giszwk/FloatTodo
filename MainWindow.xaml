@@ -7,10 +7,11 @@
         Background="Transparent" ShowInTaskbar="False" ShowActivated="False"
         WindowStartupLocation="Manual" Topmost="True"
         MouseEnter="Ball_MouseEnter" MouseLeave="Ball_MouseLeave">
-    <Grid x:Name="BallRoot" Cursor="Hand"
+    <Grid x:Name="BallRoot" Cursor="Hand" Background="Transparent"
           MouseLeftButtonDown="Ball_MouseLeftButtonDown"
           MouseLeftButtonUp="Ball_MouseLeftButtonUp"
           MouseMove="Ball_MouseMove">
         <views:BallVisual x:Name="BallVisual"/>
+        <views:CatSkinVisual x:Name="CatVisual" Visibility="Collapsed"/>
     </Grid>
 </Window>

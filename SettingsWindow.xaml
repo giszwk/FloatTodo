@@ -1,7 +1,7 @@
 <Window x:Class="FloatTodo.SettingsWindow"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-        Title="FloatTodo 设置" Width="450" Height="590"
+        Title="FloatTodo 设置" Width="470" Height="700"
         WindowStartupLocation="CenterScreen" ResizeMode="NoResize"
         WindowStyle="SingleBorderWindow" ShowInTaskbar="False" Topmost="True">
     <DockPanel Margin="22">
@@ -22,6 +22,21 @@
                     <TextBlock Grid.Row="2" Text="移出后收起延迟（100–2000ms）" VerticalAlignment="Center"/>
                     <TextBox x:Name="DelayBox" Grid.Row="2" Grid.Column="1"/>
                 </Grid>
+                <Separator Margin="0,15,0,15"/>
+                <TextBlock Text="桌面皮肤" FontSize="17" FontWeight="SemiBold" Foreground="{StaticResource Ink}" Margin="0,0,0,10"/>
+                <ComboBox x:Name="SkinCombo" Margin="0,0,0,8" SelectedIndex="0">
+                    <ComboBoxItem Content="默认蓝色悬浮球（v0.2 外观）"/>
+                    <ComboBoxItem Content="小黑猫（罗小黑风格 · 原创矢量）"/>
+                </ComboBox>
+                <TextBlock FontSize="11" Foreground="{StaticResource Muted}" TextWrapping="Wrap"
+                           Text="隐藏时露出半张脸，平均约每 48–95 秒眨眼一次；展开时保持静止，约每 38–80 秒交替播放一次 Waiting / Review 短动作。" Margin="0,0,0,10"/>
+                <StackPanel Orientation="Horizontal" Margin="0,0,0,5">
+                    <Button Content="导入原版风格图集（PNG）" Click="ImportAtlas_Click" Padding="10,5" Margin="0,0,9,0"/>
+                    <Button Content="移除导入图集" Click="RemoveAtlas_Click" Padding="10,5"/>
+                </StackPanel>
+                <TextBlock x:Name="AtlasStatus" Text="" FontSize="11" Foreground="{StaticResource Muted}" TextWrapping="Wrap" />
+                <TextBlock FontSize="11" Foreground="{StaticResource Muted}" TextWrapping="Wrap" Margin="0,4,0,0"
+                           Text="可选：用户自行从参考站点取得图集并转换为 PNG（1536×1872/2288）。导入后非隐藏状态使用图集的 Idle、Waiting 和 Review 帧；扒边动作仍使用内置原创绘图。"/>
                 <Separator Margin="0,15,0,15"/>
                 <TextBlock Text="健康提醒" FontSize="17" FontWeight="SemiBold" Foreground="{StaticResource Ink}" Margin="0,0,0,10"/>
                 <CheckBox x:Name="WaterCheck" Content="开启喝水提醒" Margin="0,0,0,8"/>

@@ -30,6 +30,7 @@ public sealed class SettingsStore
             // 配置损坏时回退默认值，待办 SQLite 数据不会受影响。
             Value = new AppSettings();
         }
+        if (!Enum.IsDefined(Value.Skin)) Value.Skin = SkinTheme.DefaultBall;
         Value.DockThresholdPx = Math.Clamp(Value.DockThresholdPx, 8, 120);
         Value.VisiblePercent = Math.Clamp(Value.VisiblePercent, 20, 80);
         Value.CollapseDelayMs = Math.Clamp(Value.CollapseDelayMs, 100, 2000);

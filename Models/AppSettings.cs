@@ -1,6 +1,7 @@
 namespace FloatTodo.Models;
 
 public enum DockSide { None, Left, Right }
+public enum SkinTheme { DefaultBall, BlackCat }
 
 public sealed class AppSettings
 {
@@ -8,6 +9,7 @@ public sealed class AppSettings
     public int? PositionX { get; set; }
     public int? PositionY { get; set; }
     public DockSide Dock { get; set; } = DockSide.None;
+    public SkinTheme Skin { get; set; } = SkinTheme.DefaultBall;
     public int DockThresholdPx { get; set; } = 30;
     public int VisiblePercent { get; set; } = 40;
     public int CollapseDelayMs { get; set; } = 350;
