@@ -1,0 +1,23 @@
+<Window x:Class="FloatTodo.EditTaskWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="编辑待办" Width="365" Height="185"
+        WindowStyle="ToolWindow" ResizeMode="NoResize" ShowInTaskbar="False"
+        WindowStartupLocation="CenterOwner" Topmost="True">
+    <Grid Margin="20">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/><RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+        </Grid.RowDefinitions>
+        <TextBlock Text="修改任务名称" FontSize="15" FontWeight="SemiBold"
+                   Foreground="{StaticResource Ink}" Margin="0,0,0,10"/>
+        <TextBox x:Name="TitleBox" Grid.Row="1" Height="37" MaxLength="200"
+                 KeyDown="TitleBox_KeyDown"/>
+        <StackPanel Grid.Row="2" Orientation="Horizontal" HorizontalAlignment="Right"
+                    VerticalAlignment="Bottom">
+            <Button Content="取消" Margin="0,0,8,0" Width="72" IsCancel="True" />
+            <Button Content="保存" Width="72" Click="Save_Click"
+                    Foreground="White" Background="#FF577DF0" />
+        </StackPanel>
+    </Grid>
+</Window>

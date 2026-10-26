@@ -1,0 +1,21 @@
+name: Windows build
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+jobs:
+  compile:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+      - name: Build
+        run: dotnet build FloatTodo.csproj --configuration Release
+      - name: Publish Windows x64
+        run: dotnet publish FloatTodo.csproj --configuration Release --runtime win-x64 --self-contained true -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true --output publish
+      - uses: actions/upload-artifact@v4
+        with:
+          name: FloatTodo-win-x64
+          path: publish/
