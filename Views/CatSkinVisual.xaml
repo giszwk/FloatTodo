@@ -16,9 +16,9 @@
                 <!-- 沿竖直轴镜像；不做上下颠倒或额外平移。 -->
                 <ScaleTransform x:Name="PeekScale" ScaleX="1" />
             </Grid.RenderTransform>
-            <!-- 图片的透明边距较大；缩放并向外偏移，使窗口仅露出 40% 时仍能看到脸与爪子。 -->
-            <Image x:Name="PeekImage" Width="54" Height="72" Stretch="Uniform"
-                   HorizontalAlignment="Left" VerticalAlignment="Center" Margin="-12,0,0,0"
+            <!-- 半隐藏时保持整只猫的尺寸；至少露出窗口的 68%（约 65px）才能完整显示猫身和墙面。 -->
+            <Image x:Name="PeekImage" Width="96" Height="128" Stretch="Uniform"
+                   HorizontalAlignment="Left" VerticalAlignment="Center" Margin="-20,0,0,0"
                    Source="/FloatTodo;component/Assets/Skins/cat-peek.png" />
         </Grid>
         <Border x:Name="CountBadge" Background="#FFFD6C78" CornerRadius="10"

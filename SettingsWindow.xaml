@@ -17,7 +17,7 @@
                     <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
                     <TextBlock Text="吸附距离（8–120 像素）" VerticalAlignment="Center" Margin="0,0,0,10"/>
                     <TextBox x:Name="DistanceBox" Grid.Column="1" Margin="0,0,0,10"/>
-                    <TextBlock Grid.Row="1" Text="半隐藏露出比例（20–80%）" VerticalAlignment="Center" Margin="0,0,0,10"/>
+                    <TextBlock Grid.Row="1" Text="半隐藏露出比例（20–80%，罗小黑至少 68%）" VerticalAlignment="Center" Margin="0,0,0,10"/>
                     <TextBox x:Name="VisibleBox" Grid.Row="1" Grid.Column="1" Margin="0,0,0,10"/>
                     <TextBlock Grid.Row="2" Text="移出后收起延迟（100–2000ms）" VerticalAlignment="Center"/>
                     <TextBox x:Name="DelayBox" Grid.Row="2" Grid.Column="1"/>

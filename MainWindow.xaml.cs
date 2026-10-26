@@ -7,6 +7,7 @@ using System.Windows.Threading;
 using FloatTodo.Interop;
 using FloatTodo.Models;
 using FloatTodo.Services;
+using FloatTodo.Views;
 using Forms = System.Windows.Forms;
 
 namespace FloatTodo;
@@ -144,9 +145,10 @@ public partial class MainWindow : Window
         int x = Math.Clamp(rect.Left, area.Left, Math.Max(area.Left, area.Right - rect.Width));
         int y = Math.Clamp(rect.Top, area.Top, Math.Max(area.Top, area.Bottom - rect.Height));
         NativeWindow.Move(this, x, y);
-        // 以松开位置（原始矩形）判断距离，避免先 clamp 后误判。
-        int leftGap = Math.Abs(rect.Left - area.Left);
-        int rightGap = Math.Abs(area.Right - rect.Right);
+        // 以松开位置（原始矩形）判断距离；拖过屏幕边缘时按 0 计算，
+        // 否则 Math.Abs 会把“超出边缘”误判成“离边缘很远”，导致时好时坏的吸附。
+        int leftGap = Math.Max(0, rect.Left - area.Left);
+        int rightGap = Math.Max(0, area.Right - rect.Right);
         int threshold = _settings.Value.DockThresholdPx;
         if (Math.Min(leftGap, rightGap) <= threshold)
         {
@@ -177,7 +179,11 @@ public partial class MainWindow : Window
         if (_dock == DockSide.None) return;
         var rect = NativeWindow.Rect(this);
         var area = _dockWork;
-        int visible = Math.Max(9, rect.Width * _settings.Value.VisiblePercent / 100);
+        int visiblePercent = _settings.Value.VisiblePercent;
+        // 罗小黑扒边图较宽：按用户比例可能只露出半张脸，68% 才能放下整只猫和扒边墙面。
+        if (_settings.Value.Skin == SkinTheme.BlackCat)
+            visiblePercent = Math.Max(visiblePercent, CatSkinVisual.PeekMinVisiblePercent);
+        int visible = Math.Max(9, rect.Width * visiblePercent / 100);
         int x = _dock == DockSide.Left
             ? area.Left - (rect.Width - visible)
             : area.Right - visible;

@@ -18,8 +18,8 @@ raws=re.findall(r'CommandText\s*=\s*"""(.*?)"""',repo,re.S)
 assert len(raws)>=5
 create=raws[0]; migrate=raws[1]; indexes=raws[2]
 for variant in ['v0.1','v0.1.1']:
-    with tempfile.NamedTemporaryFile(suffix='.db') as tmp:
-        c=sqlite3.connect(tmp.name)
+    with tempfile.TemporaryDirectory() as tmpdir:
+        c=sqlite3.connect(str(Path(tmpdir)/'todos.db'))
         if variant=='v0.1':
             c.executescript('CREATE TABLE Tasks(Id TEXT PRIMARY KEY, Title TEXT NOT NULL, IsCompleted INTEGER NOT NULL DEFAULT 0,CreatedUtc TEXT NOT NULL,CompletedUtc TEXT NULL);')
             c.execute("INSERT INTO Tasks VALUES('a','A',0,'2026-10-23T01:00:00Z',NULL)")
@@ -46,11 +46,14 @@ for variant in ['v0.1','v0.1.1']:
         assert actual==[('c',)]
         c.close()
 
-def slot_drop(ids, dragged, index):
-    old=ids.index(dragged)
-    dest=index-1 if index>old else index
-    ids=ids.copy(); ids.pop(old); ids.insert(dest,dragged); return ids
-assert slot_drop(['A','B','C'],'A',2)==['B','A','C']
-assert slot_drop(['A','B','C'],'A',3)==['B','C','A']
-assert slot_drop(['A','B','C'],'C',1)==['A','C','B']
+def reorder_before(ids, dragged, before):
+    """与 TaskRepository.ReorderBefore 相同：把 dragged 放到 before 之前，before 为 None 时移到末尾。"""
+    ids=ids.copy(); ids.remove(dragged)
+    if before is None: ids.append(dragged)
+    else: ids.insert(ids.index(before), dragged)
+    return ids
+assert reorder_before(['A','B','C','D'],'A','C')==['B','A','C','D']
+assert reorder_before(['A','B','C','D'],'D','B')==['A','D','B','C']
+assert reorder_before(['A','B','C','D'],'A',None)==['B','C','D','A']
+assert reorder_before(['A','B','C','D'],'C','D')==['A','B','C','D']
 print('PASS: 9 XAML 文件 / 事件关联 / v0.1 与 v0.1.1 数据库迁移 / 提醒查询 / 插入排序模拟')

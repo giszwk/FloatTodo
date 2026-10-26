@@ -15,6 +15,9 @@ namespace FloatTodo.Views;
 /// </summary>
 public partial class CatSkinVisual : UserControl
 {
+    /// <summary>半隐藏时至少露出窗口宽度的 68%（约 65px），保证猫脸、耳朵、爪子和扒边墙面完整可见。</summary>
+    public const int PeekMinVisiblePercent = 68;
+
     private readonly DispatcherTimer _idleTimer;
     private readonly DispatcherTimer _actionTimer;
     private readonly BitmapImage _fallbackFull;

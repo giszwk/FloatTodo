@@ -137,7 +137,11 @@ public partial class TasksWindow : Window
 
         var handle = _armedHandle;
         var item = _armedItem;
-        ResetDragCandidate();
+        // 释放鼠标捕获会同步重派发输入事件；先清空候选状态，
+        // 防止重入的 MouseMove 再次启动嵌套拖拽（会产生第二次 Drop 并落到列表末尾）。
+        _armedHandle = null;
+        _armedItem = null;
+        handle.ReleaseMouseCapture();
         _activeDrag = item;
         try { DragDrop.DoDragDrop(handle, new DataObject(TaskDragFormat, item.Id), DragDropEffects.Move); }
         finally
@@ -192,6 +196,7 @@ public partial class TasksWindow : Window
 
         // 列表行必须全部能定位；否则拒绝 Drop，绝不默认为末尾。
         var bounds = new List<(double Top, double Bottom)>();
+        double previousTop = double.NegativeInfinity;
         for (int i = 0; i < list.Items.Count; i++)
         {
             if (list.Items[i] is not TodoItem target ||
@@ -199,7 +204,10 @@ public partial class TasksWindow : Window
                 !row.IsLoaded || row.ActualHeight <= 0)
                 return false;
             double top = row.TranslatePoint(new Point(0, 0), viewer).Y;
-            if (!double.IsFinite(top)) return false;
+            // 刷新后尚未完成布局的行会全部落在 0，坐标不可信；
+            // 必须拒绝，否则任意指针位置都会被算成“列表末尾”。
+            if (!double.IsFinite(top) || top <= previousTop) return false;
+            previousTop = top;
             bounds.Add((top, top + row.ActualHeight));
         }
 
@@ -247,6 +255,7 @@ public partial class TasksWindow : Window
             return;
         }
         var item = _activeDrag!;
+        _activeDrag = null; // 只接受本次拖拽的第一次 Drop，重复事件不得再次移动
         HideDropLines();
         Change(() => _repository.ReorderBefore(item.Id, item.IsCompleted, beforeId));
         e.Effects = DragDropEffects.Move;
