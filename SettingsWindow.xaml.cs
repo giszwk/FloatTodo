@@ -1,7 +1,9 @@
 using System;
+using System.Diagnostics;
 using System.IO;
 using System.Windows;
 using FloatTodo.Services;
+using FloatTodo.Views;
 using Microsoft.Win32;
 using FloatTodo.Models;
 
@@ -15,9 +17,11 @@ public partial class SettingsWindow : Window
     private string? _pendingPeekGif;
     private bool _removeGifs;
     public bool AtlasChanged { get; private set; }
+    public event Action<SkinTheme>? SkinReloadRequested;
     public SkinTheme SelectedSkin { get; private set; }
     public int ThresholdPx { get; private set; }
     public int VisiblePercent { get; private set; }
+    public int BallScalePercent { get; private set; }
     public int CollapseDelayMs { get; private set; }
     public bool WaterEnabled { get; private set; }
     public int WaterMinutes { get; private set; }
@@ -31,11 +35,13 @@ public partial class SettingsWindow : Window
     public SettingsWindow(AppSettings settings)
     {
         InitializeComponent();
-        SkinCombo.SelectedIndex = settings.Skin == SkinTheme.BlackCat ? 1 : 0;
+        SkinCombo.SelectedIndex = (int)settings.Skin;
         RefreshAtlasStatus();
         RefreshGifStatus();
+        RefreshCustomStatus();
         DistanceBox.Text = settings.DockThresholdPx.ToString();
         VisibleBox.Text = settings.VisiblePercent.ToString();
+        SizeBox.Text = settings.BallScalePercent.ToString();
         DelayBox.Text = settings.CollapseDelayMs.ToString();
         WaterCheck.IsChecked = settings.WaterEnabled;
         WaterBox.Text = settings.WaterIntervalMinutes.ToString();
@@ -87,6 +93,70 @@ public partial class SettingsWindow : Window
         GifStatus.Text = _removeGifs ? "保存后删除两个 GIF，恢复内置 GIF 动作。"
             : $"展开：{(_pendingFullGif is not null ? "待导入" : File.Exists(SkinGif.FullPath) ? "已导入" : "内置 GIF")}" +
               $"；扒边：{(_pendingPeekGif is not null ? "待导入" : File.Exists(SkinGif.PeekPath) ? "已导入" : "内置 GIF")}";
+    }
+
+    private void RefreshCustomStatus()
+    {
+        int portable = CountCustomFiles(SkinGif.PortableCustomDir);
+        int user = CountCustomFiles(SkinGif.UserCustomDir);
+        var active = CatSkinVisual.ResolveCustomSkinDir();
+        string state = active == SkinGif.PortableCustomDir ? "当前使用：程序目录"
+            : active == SkinGif.UserCustomDir ? "当前使用：用户目录（兼容回退）"
+            : "当前回退：默认蓝色悬浮球";
+        CustomStatus.Text =
+            $"程序目录（优先）：{SkinGif.PortableCustomDir} — {portable}/4\n" +
+            $"用户目录（兼容）：{SkinGif.UserCustomDir} — {user}/4\n" + state;
+    }
+
+    private static int CountCustomFiles(string dir)
+    {
+        int found = 0;
+        foreach (var name in SkinGif.CustomFileNames)
+            if (File.Exists(Path.Combine(dir, name))) found++;
+        return found;
+    }
+
+    private void OpenCustomSkinFolder_Click(object sender, RoutedEventArgs e)
+    {
+        string dir = SkinGif.PortableCustomDir;
+        try
+        {
+            Directory.CreateDirectory(dir);
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            // 程序目录不可写（例如装在 Program Files）时退回用户目录。
+            dir = SkinGif.UserCustomDir;
+            try
+            {
+                Directory.CreateDirectory(dir);
+            }
+            catch (Exception inner) when (inner is IOException or UnauthorizedAccessException)
+            {
+                MessageBox.Show(this, "无法创建自定义皮肤目录：" + inner.Message, "打开失败", MessageBoxButton.OK, MessageBoxImage.Warning);
+                return;
+            }
+        }
+
+        try
+        {
+            Process.Start(new ProcessStartInfo
+            {
+                FileName = dir,
+                UseShellExecute = true
+            });
+            RefreshCustomStatus();
+        }
+        catch (Exception ex) when (ex is IOException or System.ComponentModel.Win32Exception)
+        {
+            MessageBox.Show(this, "无法打开文件夹：" + ex.Message, "打开失败", MessageBoxButton.OK, MessageBoxImage.Warning);
+        }
+    }
+
+    private void ReloadSkin_Click(object sender, RoutedEventArgs e)
+    {
+        SkinReloadRequested?.Invoke((SkinTheme)SkinCombo.SelectedIndex);
+        RefreshCustomStatus();
     }
 
     private void ImportFullGif_Click(object sender, RoutedEventArgs e) => ImportGif(false);
@@ -199,6 +269,7 @@ public partial class SettingsWindow : Window
     {
         if (!int.TryParse(DistanceBox.Text, out int threshold) || threshold is < 8 or > 120 ||
             !int.TryParse(VisibleBox.Text, out int visible) || visible is < 20 or > 80 ||
+            !int.TryParse(SizeBox.Text, out int scale) || scale is < 50 or > 200 ||
             !int.TryParse(DelayBox.Text, out int delay) || delay is < 100 or > 2000 ||
             !int.TryParse(WaterBox.Text, out int water) || water is < 10 or > 240 ||
             !int.TryParse(SittingBox.Text, out int sitting) || sitting is < 10 or > 240 ||
@@ -209,9 +280,10 @@ public partial class SettingsWindow : Window
             return;
         }
         if (!SaveAtlasChanges() || !SaveGifChanges()) return;
-        SelectedSkin = SkinCombo.SelectedIndex == 1 ? SkinTheme.BlackCat : SkinTheme.DefaultBall;
+        SelectedSkin = (SkinTheme)SkinCombo.SelectedIndex;
         ThresholdPx = threshold;
         VisiblePercent = visible;
+        BallScalePercent = scale;
         CollapseDelayMs = delay;
         WaterEnabled = WaterCheck.IsChecked == true;
         WaterMinutes = water;

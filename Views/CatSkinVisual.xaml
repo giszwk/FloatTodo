@@ -1,12 +1,14 @@
 <UserControl x:Class="FloatTodo.Views.CatSkinVisual"
              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-             Width="96" Height="96" Background="Transparent">
+             Background="Transparent">
     <Grid Width="96" Height="96">
+        <Grid.LayoutTransform>
+            <ScaleTransform x:Name="RootScale" ScaleX="1" ScaleY="1" />
+        </Grid.LayoutTransform>
         <!-- 猫咪仅使用位图图片或 GIF 帧；不再使用矢量路径绘制。 -->
         <Grid x:Name="FullArtwork" Width="96" Height="96" IsHitTestVisible="False">
-            <Image x:Name="FullImage" Width="96" Height="96" Stretch="Uniform"
-                   Source="/FloatTodo;component/Assets/Skins/cat-visible.png">
+            <Image x:Name="FullImage" Width="96" Height="96" Stretch="Uniform">
                 <Image.RenderTransform><TranslateTransform x:Name="FullImageMove" /></Image.RenderTransform>
             </Image>
         </Grid>
@@ -18,8 +20,7 @@
             </Grid.RenderTransform>
             <!-- 半隐藏时保持整只猫的尺寸；至少露出窗口的 68%（约 65px）才能完整显示猫身和墙面。 -->
             <Image x:Name="PeekImage" Width="96" Height="128" Stretch="Uniform"
-                   HorizontalAlignment="Left" VerticalAlignment="Center" Margin="-20,0,0,0"
-                   Source="/FloatTodo;component/Assets/Skins/cat-peek.png" />
+                   HorizontalAlignment="Left" VerticalAlignment="Center" Margin="-20,0,0,0" />
         </Grid>
         <Border x:Name="CountBadge" Background="#FFFD6C78" CornerRadius="10"
                 MinWidth="19" Height="19" Padding="4,0" HorizontalAlignment="Right"

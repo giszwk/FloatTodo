@@ -15,6 +15,15 @@ public sealed class SkinGif
     public static string FullPath => Path.Combine(AppPaths.DataDir, "skins", "black-cat", "full.gif");
     public static string PeekPath => Path.Combine(AppPaths.DataDir, "skins", "black-cat", "peek.gif");
 
+    /// <summary>随程序分发的自定义皮肤目录（优先）：EXE 旁的 Assets\Skins\Custom。</summary>
+    public static string PortableCustomDir => Path.Combine(AppContext.BaseDirectory, "Assets", "Skins", "Custom");
+
+    /// <summary>旧版用户目录，仅用于兼容此前放在 %LOCALAPPDATA% 的素材。</summary>
+    public static string UserCustomDir => Path.Combine(AppPaths.DataDir, "skins", "custom");
+
+    public static IReadOnlyList<string> CustomFileNames { get; } =
+        new[] { "idle.gif", "waiting.gif", "review.gif", "peek.gif" };
+
     public IReadOnlyList<BitmapSource> Frames { get; }
     public IReadOnlyList<TimeSpan> Durations { get; }
 

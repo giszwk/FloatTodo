@@ -1,7 +1,7 @@
 namespace FloatTodo.Models;
 
 public enum DockSide { None, Left, Right }
-public enum SkinTheme { DefaultBall, BlackCat }
+public enum SkinTheme { DefaultBall, BlackCat, Custom }
 
 public sealed class AppSettings
 {
@@ -12,6 +12,7 @@ public sealed class AppSettings
     public SkinTheme Skin { get; set; } = SkinTheme.DefaultBall;
     public int DockThresholdPx { get; set; } = 30;
     public int VisiblePercent { get; set; } = 40;
+    public int BallScalePercent { get; set; } = 100;
     public int CollapseDelayMs { get; set; } = 350;
     public bool WaterEnabled { get; set; } = true;
     public int WaterIntervalMinutes { get; set; } = 60;

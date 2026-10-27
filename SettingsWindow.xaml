@@ -14,22 +14,25 @@
                 <TextBlock Text="悬浮球设置" FontSize="18" FontWeight="SemiBold" Foreground="{StaticResource Ink}" Margin="0,0,0,14"/>
                 <Grid>
                     <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="96"/></Grid.ColumnDefinitions>
-                    <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
+                    <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
                     <TextBlock Text="吸附距离（8–120 像素）" VerticalAlignment="Center" Margin="0,0,0,10"/>
                     <TextBox x:Name="DistanceBox" Grid.Column="1" Margin="0,0,0,10"/>
-                    <TextBlock Grid.Row="1" Text="半隐藏露出比例（20–80%，罗小黑至少 68%）" VerticalAlignment="Center" Margin="0,0,0,10"/>
+                    <TextBlock Grid.Row="1" Text="半隐藏露出比例（20–80%，猫类皮肤至少 68%）" VerticalAlignment="Center" Margin="0,0,0,10"/>
                     <TextBox x:Name="VisibleBox" Grid.Row="1" Grid.Column="1" Margin="0,0,0,10"/>
-                    <TextBlock Grid.Row="2" Text="移出后收起延迟（100–2000ms）" VerticalAlignment="Center"/>
-                    <TextBox x:Name="DelayBox" Grid.Row="2" Grid.Column="1"/>
+                    <TextBlock Grid.Row="2" Text="移出后收起延迟（100–2000ms）" VerticalAlignment="Center" Margin="0,0,0,10"/>
+                    <TextBox x:Name="DelayBox" Grid.Row="2" Grid.Column="1" Margin="0,0,0,10"/>
+                    <TextBlock Grid.Row="3" Text="悬浮球大小（50–200%）" VerticalAlignment="Center"/>
+                    <TextBox x:Name="SizeBox" Grid.Row="3" Grid.Column="1"/>
                 </Grid>
                 <Separator Margin="0,15,0,15"/>
                 <TextBlock Text="桌面皮肤" FontSize="17" FontWeight="SemiBold" Foreground="{StaticResource Ink}" Margin="0,0,0,10"/>
                 <ComboBox x:Name="SkinCombo" Margin="0,0,0,8" SelectedIndex="0">
                     <ComboBoxItem Content="默认蓝色悬浮球（v0.2 外观）"/>
                     <ComboBoxItem Content="罗小黑 GIF（内置 idle/waiting/review）"/>
+                    <ComboBoxItem Content="自定义 GIF（skins\custom 文件夹）"/>
                 </ComboBox>
                 <TextBlock FontSize="11" Foreground="{StaticResource Muted}" TextWrapping="Wrap"
-                           Text="展开默认停在 idle 第一帧，每 45–100 秒交替播放 waiting/review；半隐藏暂用 idle，每 60–120 秒短暂播放。可导入专用 GIF 替换。" Margin="0,0,0,10"/>
+                           Text="展开默认停在 idle 第一帧，每 45–100 秒交替播放 waiting/review；半隐藏每 60–120 秒眨眼一次。内置皮肤可导入专用 GIF 替换。" Margin="0,0,0,10"/>
                 <StackPanel Orientation="Horizontal" Margin="0,0,0,5">
                     <Button Content="导入原版风格图集（PNG）" Click="ImportAtlas_Click" Padding="10,5" Margin="0,0,9,0"/>
                     <Button Content="移除导入图集" Click="RemoveAtlas_Click" Padding="10,5"/>
@@ -43,6 +46,15 @@
                 <TextBlock x:Name="GifStatus" FontSize="11" Foreground="{StaticResource Muted}" TextWrapping="Wrap"/>
                 <TextBlock FontSize="11" Foreground="{StaticResource Muted}" TextWrapping="Wrap" Margin="0,5,0,0"
                            Text="自行导入的 GIF 优先于内置动作；移除自定义 GIF 后恢复内置。单次仅播放一次，最长 3 秒。最大 64 帧、640×640、20MB。"/>
+                <Separator Margin="0,12,0,10"/>
+                <TextBlock Text="自定义皮肤" FontSize="15" FontWeight="SemiBold" Foreground="{StaticResource Ink}" Margin="0,0,0,6"/>
+                <TextBlock x:Name="CustomStatus" FontSize="11" Foreground="{StaticResource Muted}" TextWrapping="Wrap" Margin="0,0,0,6"/>
+                <StackPanel Orientation="Horizontal" Margin="0,0,0,5">
+                    <Button Content="打开自定义皮肤文件夹" Click="OpenCustomSkinFolder_Click" Padding="8,5" Margin="0,0,7,0"/>
+                    <Button Content="重新加载皮肤" Click="ReloadSkin_Click" Padding="8,5"/>
+                </StackPanel>
+                <TextBlock FontSize="11" Foreground="{StaticResource Muted}" TextWrapping="Wrap"
+                           Text="把 idle.gif / waiting.gif / review.gif / peek.gif 放进程序目录的 Assets\Skins\Custom（优先，设置里可一键打开）。旧的 %LOCALAPPDATA%\FloatTodo\skins\custom 仍兼容。四个文件必须齐全且可读取，任一缺失或无效时整体回退默认蓝色悬浮球。替换后点“重新加载皮肤”立即生效，或保存设置/重启程序。"/>
                 <Separator Margin="0,15,0,15"/>
                 <TextBlock Text="健康提醒" FontSize="17" FontWeight="SemiBold" Foreground="{StaticResource Ink}" Margin="0,0,0,10"/>
                 <CheckBox x:Name="WaterCheck" Content="开启喝水提醒" Margin="0,0,0,8"/>

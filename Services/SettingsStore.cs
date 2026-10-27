@@ -33,6 +33,7 @@ public sealed class SettingsStore
         if (!Enum.IsDefined(Value.Skin)) Value.Skin = SkinTheme.DefaultBall;
         Value.DockThresholdPx = Math.Clamp(Value.DockThresholdPx, 8, 120);
         Value.VisiblePercent = Math.Clamp(Value.VisiblePercent, 20, 80);
+        Value.BallScalePercent = Math.Clamp(Value.BallScalePercent, 50, 200);
         Value.CollapseDelayMs = Math.Clamp(Value.CollapseDelayMs, 100, 2000);
         Value.WaterIntervalMinutes = Math.Clamp(Value.WaterIntervalMinutes, 10, 240);
         Value.SittingIntervalMinutes = Math.Clamp(Value.SittingIntervalMinutes, 10, 240);

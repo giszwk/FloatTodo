@@ -31,6 +31,7 @@ public partial class MainWindow : Window
     private DockSide _dock;
     private NativeWindow.PixelRect _dockWork;
     private bool _expanded;
+    private SkinTheme _appliedSkin = SkinTheme.DefaultBall;
 
     public MainWindow(TaskRepository repository, SettingsStore settings)
     {
@@ -38,7 +39,6 @@ public partial class MainWindow : Window
         _settings = settings;
         _dock = settings.Value.Dock;
         InitializeComponent();
-        CatVisual.ReloadAtlas();
         ApplySkinVisual(false);
 
         // 先初始化计时器，再注册会访问计时器的面板事件，避免 CS8602 空引用警告。
@@ -133,7 +133,10 @@ public partial class MainWindow : Window
             CompleteDrag();
         }
         else
+        {
+            CatVisual.PlayRandomAction();
             ShowPanel();
+        }
         e.Handled = true;
     }
 
@@ -181,7 +184,7 @@ public partial class MainWindow : Window
         var area = _dockWork;
         int visiblePercent = _settings.Value.VisiblePercent;
         // 罗小黑扒边图较宽：按用户比例可能只露出半张脸，68% 才能放下整只猫和扒边墙面。
-        if (_settings.Value.Skin == SkinTheme.BlackCat)
+        if (_appliedSkin != SkinTheme.DefaultBall)
             visiblePercent = Math.Max(visiblePercent, CatSkinVisual.PeekMinVisiblePercent);
         int visible = Math.Max(9, rect.Width * visiblePercent / 100);
         int x = _dock == DockSide.Left
@@ -277,14 +280,10 @@ public partial class MainWindow : Window
     // 皮肤与窗口尺寸分离。桌面拖动/吸边始终操作主窗口，不与具体绘图绑定。
     private void ApplySkinVisual(bool reposition)
     {
-        bool cat = _settings.Value.Skin == SkinTheme.BlackCat;
         NativeWindow.PixelRect before = default;
         if (reposition && IsLoaded) before = NativeWindow.Rect(this);
-        BallVisual.Visibility = cat ? Visibility.Collapsed : Visibility.Visible;
-        CatVisual.Visibility = cat ? Visibility.Visible : Visibility.Collapsed;
-        Width = cat ? 96 : 64;
-        Height = cat ? 96 : 64;
-        CatVisual.SetDockState(_dock != DockSide.None && !_expanded, _dock);
+
+        ApplySkinLayout(CatVisual.ApplySkin(_settings.Value.Skin));
 
         if (!reposition || !IsLoaded) return;
         // 先让 WPF 完成 Window 的实际尺寸变化，再按物理像素重新定位。
@@ -311,6 +310,26 @@ public partial class MainWindow : Window
             }
             SavePosition();
         }), DispatcherPriority.Loaded);
+    }
+
+    private void ApplySkinLayout(SkinTheme applied)
+    {
+        _appliedSkin = applied;
+        bool cat = applied != SkinTheme.DefaultBall;
+        double scale = Math.Clamp(_settings.Value.BallScalePercent, 50, 200) / 100.0;
+        int size = (int)Math.Round((cat ? 96 : 64) * scale);
+        BallVisual.SetUiScale(scale);
+        CatVisual.SetUiScale(scale);
+        BallVisual.Visibility = cat ? Visibility.Collapsed : Visibility.Visible;
+        CatVisual.Visibility = cat ? Visibility.Visible : Visibility.Collapsed;
+        Width = size;
+        Height = size;
+        CatVisual.SetDockState(_dock != DockSide.None && !_expanded, _dock);
+    }
+
+    private void PreviewSkin(SkinTheme theme)
+    {
+        ApplySkinLayout(CatVisual.ApplySkin(theme));
     }
 
     private void SwitchSkin(SkinTheme skin)
@@ -345,13 +364,10 @@ public partial class MainWindow : Window
 
     private void CreateTray()
     {
-        var iconFile = Path.Combine(AppContext.BaseDirectory, "Assets", "AppIcon.ico");
         _tray = new Forms.NotifyIcon
         {
             Text = "FloatTodo · 桌面待办",
-            Icon = File.Exists(iconFile)
-                ? new System.Drawing.Icon(iconFile)
-                : System.Drawing.SystemIcons.Application,
+            Icon = LoadTrayIcon(),
             Visible = true
         };
         var menu = new Forms.ContextMenuStrip();
@@ -367,6 +383,33 @@ public partial class MainWindow : Window
         menu.Items.Add("退出", null, (_, _) => Dispatcher.Invoke(ExitApp));
         _tray.ContextMenuStrip = menu;
         _tray.DoubleClick += (_, _) => Dispatcher.Invoke(() => { ShowBall(); ShowPanel(); });
+    }
+
+    private static System.Drawing.Icon LoadTrayIcon()
+    {
+        var iconFile = Path.Combine(AppContext.BaseDirectory, "Assets", "AppIcon.ico");
+        if (File.Exists(iconFile))
+        {
+            try { return new System.Drawing.Icon(iconFile); }
+            catch (ArgumentException) { /* 文件损坏时继续尝试 EXE 内嵌图标 */ }
+        }
+
+        // 单文件发布可能没有外部 ico；ApplicationIcon 已嵌在 EXE 资源里，直接提取。
+        try
+        {
+            var exe = Environment.ProcessPath;
+            if (!string.IsNullOrEmpty(exe))
+            {
+                var icon = System.Drawing.Icon.ExtractAssociatedIcon(exe);
+                if (icon is not null) return icon;
+            }
+        }
+        catch (Exception ex) when (ex is ArgumentException or IOException or System.ComponentModel.Win32Exception)
+        {
+            // 忽略并退回系统默认图标。
+        }
+
+        return System.Drawing.SystemIcons.Application;
     }
 
     private void RefreshTrayVisibilityText()
@@ -408,28 +451,36 @@ public partial class MainWindow : Window
         try
         {
             var dialog = new SettingsWindow(_settings.Value);
-            if (dialog.ShowDialog() == true)
+            bool previewed = false;
+            dialog.SkinReloadRequested += theme =>
             {
-                _settings.Value.DockThresholdPx = dialog.ThresholdPx;
-                _settings.Value.VisiblePercent = dialog.VisiblePercent;
-                _settings.Value.CollapseDelayMs = dialog.CollapseDelayMs;
-                _settings.Value.WaterEnabled = dialog.WaterEnabled;
-                _settings.Value.WaterIntervalMinutes = dialog.WaterMinutes;
-                _settings.Value.SittingEnabled = dialog.SittingEnabled;
-                _settings.Value.SittingIntervalMinutes = dialog.SittingMinutes;
-                _settings.Value.ReminderSound = dialog.SoundEnabled;
-                _settings.Value.SuppressFullscreen = dialog.SuppressFullscreen;
-                _settings.Value.QuietStartHour = dialog.QuietStartHour;
-                _settings.Value.QuietEndHour = dialog.QuietEndHour;
-                var skinChanged = _settings.Value.Skin != dialog.SelectedSkin;
-                _settings.Value.Skin = dialog.SelectedSkin;
-                _settings.Save();
-                if (dialog.AtlasChanged) CatVisual.ReloadAtlas();
-                if (skinChanged) ApplySkinVisual(true);
-                _reminders.SettingsChanged();
-                if (_dock != DockSide.None && !skinChanged)
-                    SnapToEdge();
+                previewed = true;
+                PreviewSkin(theme);
+            };
+            if (dialog.ShowDialog() != true)
+            {
+                // 取消时撤销“重新加载皮肤”可能造成的主题预览。
+                if (previewed) ApplySkinVisual(true);
+                return;
             }
+
+            _settings.Value.DockThresholdPx = dialog.ThresholdPx;
+            _settings.Value.VisiblePercent = dialog.VisiblePercent;
+            _settings.Value.BallScalePercent = dialog.BallScalePercent;
+            _settings.Value.CollapseDelayMs = dialog.CollapseDelayMs;
+            _settings.Value.WaterEnabled = dialog.WaterEnabled;
+            _settings.Value.WaterIntervalMinutes = dialog.WaterMinutes;
+            _settings.Value.SittingEnabled = dialog.SittingEnabled;
+            _settings.Value.SittingIntervalMinutes = dialog.SittingMinutes;
+            _settings.Value.ReminderSound = dialog.SoundEnabled;
+            _settings.Value.SuppressFullscreen = dialog.SuppressFullscreen;
+            _settings.Value.QuietStartHour = dialog.QuietStartHour;
+            _settings.Value.QuietEndHour = dialog.QuietEndHour;
+            _settings.Value.Skin = dialog.SelectedSkin;
+            _settings.Save();
+            // 重新载入素材：既应用导入变更，也让 skins\custom 中替换过的 GIF 生效。
+            ApplySkinVisual(true);
+            _reminders.SettingsChanged();
         }
         finally { _settingsOpen = false; }
     }
